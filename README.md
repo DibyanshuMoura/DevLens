@@ -179,11 +179,11 @@ http://localhost:5173
 
 ### Analysis Report
 
-<img width="100%" alt="Analysis Report" src="./screenshots/analysis.png">
+<img width="100%" alt="Analysis Report" src="./Screenshots/Analysis.png">
 
 ### Mobile View
 
-<img width="40%" alt="Mobile View" src="./screenshots/mobile.png">
+<img width="40%" alt="Mobile View" src="./Screenshots/Mobile.png">
 
 ---
 
