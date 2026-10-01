@@ -10,6 +10,7 @@ import { PDFParse } from "pdf-parse";
 import authRouter from "./auth.js";
 import { appendSnapshot } from "./history.js";
 import { connectDB } from "./db.js";
+import { fetchGitHubData } from "./github.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -37,6 +38,90 @@ const upload = multer({
 
 const MAX_RESUME_CHARS = 6000;
 
+const DEFAULT_GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
+/** Parse LLM output even when it arrives fenced or wrapped in prose. */
+function parseJsonLoose(text) {
+  let t = String(text).trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  try {
+    return JSON.parse(t);
+  } catch {
+    // Last resort: slice out the outermost {...} / [...] block.
+    const start = t.search(/[{[]/);
+    const end = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
+    if (start !== -1 && end > start) {
+      return JSON.parse(t.slice(start, end + 1));
+    }
+    throw new Error("AI returned invalid JSON");
+  }
+}
+
+/**
+ * Ask Groq for a JSON answer and return the parsed object.
+ *
+ * gpt-oss models occasionally fail json_object validation ("Failed to
+ * validate JSON"), so: attempt 1 is strict JSON mode; attempt 2 retries the
+ * same model without response_format; attempt 3 falls back to the smaller
+ * model that reliably honors json mode.
+ */
+async function callGroqJson(prompt, { temperature = 0.4 } = {}) {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error("Groq API key is missing");
+  }
+  const attempts = [
+    { model: DEFAULT_GROQ_MODEL, jsonMode: true },
+    { model: DEFAULT_GROQ_MODEL, jsonMode: false },
+    { model: "openai/gpt-oss-20b", jsonMode: true },
+  ];
+  let lastError = new Error("LLM request failed");
+
+  for (const attempt of attempts) {
+    let content = prompt;
+    if (!attempt.jsonMode) {
+      content +=
+        "\n\nIMPORTANT: Respond with ONLY the raw JSON object — no markdown fences, no commentary.";
+    }
+    const body = {
+      model: attempt.model,
+      temperature,
+      messages: [{ role: "user", content }],
+    };
+    if (attempt.jsonMode) body.response_format = { type: "json_object" };
+
+    try {
+      const response = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        lastError = new Error(err.error?.message || "LLM request failed");
+        if (response.status === 401 || response.status === 403) throw lastError;
+        continue;
+      }
+      const text = (await response.json())?.choices?.[0]?.message?.content;
+      if (!text) {
+        lastError = new Error("Invalid AI response");
+        continue;
+      }
+      return parseJsonLoose(text);
+    } catch (err) {
+      lastError = err;
+      if (err.message === "Groq API key is missing") throw err;
+    }
+  }
+  throw lastError;
+}
+
 async function extractResumeText(file) {
   const parser = new PDFParse({ data: file.buffer });
   try {
@@ -53,7 +138,7 @@ async function extractResumeText(file) {
   }
 }
 
-function buildPrompt(userData, resumeText) {
+function buildPrompt(userData, resumeText, jobRole) {
   const resumeSection = resumeText
     ? `
   Candidate Resume (text extracted from uploaded PDF):
@@ -69,6 +154,45 @@ function buildPrompt(userData, resumeText) {
   `
     : "";
 
+  const roleSection = jobRole
+    ? `
+  Target Job Role: ${jobRole}
+
+  The candidate is applying for this specific role. Evaluate the profile
+  against what employers typically look for in that role. For "roleFit":
+  - "score": integer 0-100, how ready this profile is for the role
+  - "summary": one sentence on overall fit for the role
+  - "strengths": exactly 3 short points where the GitHub profile supports the role
+  - "gaps": exactly 3 short points — concrete things present in the GitHub
+    profile and resume but MISSING from the candidate's current resume
+    (e.g. an unstated project, an unlisted skill, a repo-worthy achievement
+    they should add), or small role-relevant weaknesses to fix. Each point
+    must be phrased as something actionable for the resume.
+  When no resume is provided, base "gaps" on what the GitHub data shows
+  that a resume should mention.
+  `
+    : "";
+
+  const roleFitRules = jobRole
+    ? `  - "roleFit": object for the target role — {"score": 0-100 integer,
+      "summary": one sentence on fit, "strengths": 3 short points where the
+      GitHub profile supports the role, "gaps": 3 short points describing
+      concrete things visible in the GitHub profile and resume that are
+      MISSING from the resume (an unstated project, an unlisted skill, a
+      repo-worthy achievement), phrased as resume-ready additions
+`
+    : "  - Omit the roleFit field entirely unless a target job role is provided\n";
+
+  const roleFitExample = jobRole
+    ? `    "roleFit": {
+      "score": 80,
+      "summary": "sentence",
+      "strengths": ["point", "point", "point"],
+      "gaps": ["point", "point", "point"]
+    }
+`
+    : "";
+
   return `
   You are a senior engineering recruiter and GitHub profile analyzer.
 
@@ -77,6 +201,7 @@ function buildPrompt(userData, resumeText) {
   GitHub Data:
   ${JSON.stringify(userData)}
   ${resumeSection}
+${roleSection}
   STRICT RULES:
   - Return ONLY valid JSON
   - Do not include markdown
@@ -93,7 +218,11 @@ function buildPrompt(userData, resumeText) {
   - "activity": exactly 3 objects, each {"title": short label, "detail": one sentence}
   - "strengths", "weaknesses", "improvements": each exactly 3 short bullet points
   - "resumeMatch": 3 short bullet points when a resume is provided, otherwise []
-
+  - "quote": ONE line (max ~90 characters) that captures this developer's
+    spirit — either a real famous quote about building/craft/perseverance
+    with its author as "text" — "Author", or an original line written in
+    the same style. No emojis, no hashtags.
+${roleFitRules}
   Expected JSON format:
 
   {
@@ -124,104 +253,67 @@ function buildPrompt(userData, resumeText) {
       "point",
       "point",
       "point"
-    ]
-  }
+    ],
+    "quote": "Talk is cheap. Show me the code. — Linus Torvalds"${jobRole ? `,` : ""}
+${jobRole ? roleFitExample : ""}  }
   `;
 }
 
-async function analyzeProfile(req, res, username, resumeText) {
+const JOB_ROLES = [
+  "Frontend Developer",
+  "Backend Developer",
+  "Full Stack Developer",
+  "Mobile App Developer",
+  "DevOps Engineer",
+  "Data Analyst",
+  "Data Scientist",
+  "Machine Learning Engineer",
+  "AI Engineer",
+  "Software Engineer",
+  "Software Development Engineer (SDE)",
+  "Cloud Engineer",
+  "Cybersecurity Analyst",
+  "Game Developer",
+  "UI/UX Engineer",
+  "QA / Test Automation Engineer",
+  "Blockchain Developer",
+  "Database Administrator",
+  "Site Reliability Engineer (SRE)",
+  "Technical Writer",
+];
+
+// Job role list for the frontend dropdown.
+app.get("/roles", (_req, res) => {
+  res.json({ roles: JOB_ROLES });
+});
+
+async function analyzeProfile(req, res, username, resumeText, jobRole) {
   try {
-    const resp = await fetch(`https://api.github.com/users/${username}`);
-    if (!resp.ok) {
-      return res.status(404).json({
-        message: "GitHub user not found",
-      });
-    }
-    const user = await resp.json();
-    const reposRes = await fetch(user.repos_url);
-    if (!reposRes.ok) {
-      throw new Error("Failed to fetch repositories");
-    }
-    const repos = await reposRes.json();
+    const gh = await fetchGitHubData(username);
+    const user = gh.user;
+    const ranked = gh.ranked;
+    const stars = gh.stars;
+    const forks = gh.forks;
+    const active = gh.active;
+    const accountAgeYears = gh.accountAgeYears;
+    const userData = gh.userData;
 
-    let stars = 0,
-      langs = {},
-      active = 0,
-      forks = 0;
+    const prompt = buildPrompt(userData, resumeText, jobRole);
+    const parsed = await callGroqJson(prompt);
 
-    const ranked = [...repos].sort(
-      (a, b) => b.stargazers_count - a.stargazers_count,
-    );
-
-    repos.forEach((r) => {
-      stars += r.stargazers_count;
-      forks += r.forks_count;
-      if (r.language) langs[r.language] = (langs[r.language] || 0) + 1;
-      if (new Date() - new Date(r.updated_at) < 30 * 86400000) active++;
-    });
-
-    const accountAgeYears =
-      (Date.now() - new Date(user.created_at)) / (365.25 * 86400000);
-
-    const userData = {
-      username: user.login,
-      repos: user.public_repos,
-      followers: user.followers,
-      stars,
-      forks,
-      accountAgeYears: Number(accountAgeYears.toFixed(1)),
-      languages: Object.keys(langs).slice(0, 3),
-      activeRepos: active,
-      topRepos: ranked.slice(0, 3).map((r) => ({
-        name: r.name,
-        stars: r.stargazers_count,
-        language: r.language,
-      })),
-    };
-
-    const prompt = buildPrompt(userData, resumeText);
-
-    if (!process.env.GROQ_API_KEY) {
-      throw new Error("Groq API key is missing");
-    }
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
-          response_format: {
-            type: "json_object",
-          },
-          messages: [{ role: "user", content: prompt }],
-        }),
-      },
-    );
-    if (!response.ok) {
-      const err = await response.json();
-
-      return res.status(response.status).json({
-        message: err.error?.message || "LLM request failed",
-      });
-    }
-    const data = await response.json();
-    const text = data?.choices[0]?.message?.content;
-    if (!text) {
-      return res.status(500).json({
-        message: "Invalid AI response",
-      });
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return res.status(500).json({
-        message: "AI returned invalid JSON",
-      });
+    // The quote is cosmetic (profile-card only) — if the model skipped it,
+    // fall back to a deterministic pick so the card always has one.
+    if (!parsed.quote || typeof parsed.quote !== "string") {
+      const QUOTE_FALLBACKS = [
+        "Talk is cheap. Show me the code. — Linus Torvalds",
+        "Simplicity is the soul of efficiency. — Austin Freeman",
+        "First, solve the problem. Then, write the code. — John Johnson",
+        "Make it work, make it right, make it fast. — Kent Beck",
+        "Programming isn't about what you know; it's about what you can figure out. — Chris Pine",
+        "The best way to predict the future is to invent it. — Alan Kay",
+      ];
+      parsed.quote =
+        QUOTE_FALLBACKS[userData.username.length % QUOTE_FALLBACKS.length];
     }
     // Snapshot for the signed-in user's history/comparison view.
     // The JWT is verified defensively — analysis still succeeds for
@@ -260,13 +352,14 @@ async function analyzeProfile(req, res, username, resumeText) {
       id: user.html_url,
       res: parsed,
       hasResume: Boolean(resumeText),
+      role: jobRole || null,
       stats: {
         repos: user.public_repos,
         followers: user.followers,
         stars,
         forks,
         activeRepos: active,
-        accountAgeYears: Number(accountAgeYears.toFixed(1)),
+        accountAgeYears,
         languages: userData.languages,
         topRepos: ranked.slice(0, 5).map((r) => ({
           name: r.name,
@@ -316,7 +409,10 @@ app.get("/analyze", requireSignedIn, (req, res) => {
   if (!username) {
     return res.status(400).json({ message: "Username is required" });
   }
-  analyzeProfile(req, res, username, "");
+  const role = JOB_ROLES.find(
+    (r) => r.toLowerCase() === String(req.query.role || "").trim().toLowerCase(),
+  );
+  analyzeProfile(req, res, username, "", role || null);
 });
 
 app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) => {
@@ -326,6 +422,9 @@ app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) 
   if (!username) {
     return res.status(400).json({ message: "Username is required" });
   }
+  const role = JOB_ROLES.find(
+    (r) => r.toLowerCase() === String(req.body?.role || "").trim().toLowerCase(),
+  );
 
   let resumeText = "";
   if (req.file) {
@@ -339,7 +438,7 @@ app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) 
     }
   }
 
-  analyzeProfile(req, res, username.trim(), resumeText);
+  analyzeProfile(req, res, username.trim(), resumeText, role || null);
 });
 
 // Multer errors (file too large, wrong type, etc.) land here as JSON.

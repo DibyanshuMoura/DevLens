@@ -24,7 +24,12 @@ One-click analysis of your own GitHub profile after signing in (no username typi
 * Generate AI-powered weaknesses assessment
 * Generate AI-powered improvement suggestions
 * Resume ↔ GitHub cross-check showing where the resume and public work agree or contradict
+* Target job role — pick a tech role from a dropdown and get a role-fit score
+  with the strengths and gaps for that role
+* Resume improvement hints — shows what your GitHub proves that your resume
+  is missing, so you can add it yourself and boost your chances
 * Downloadable profile card — export the report as a shareable 2x PNG image
+  (button-only, no inline preview)
 * Responsive and minimal user interface
 * Error handling for invalid usernames and API failures
 
@@ -70,6 +75,7 @@ DevLens/
 │
 ├── Backend/
 │   ├── server.js
+│   ├── github.js
 │   ├── package.json
 │   └── .env
 │
@@ -201,10 +207,28 @@ Optionally attach a resume PDF alongside the GitHub username. The backend
 extracts the text from the PDF (in memory, nothing is stored on disk) and
 includes it in the LLM prompt, so the generated strengths, weaknesses, and
 improvements consider both the GitHub activity and the candidate's stated
-skills, projects, and experience.
+skills, projects, and experience. The same text powers the job-role gap
+detection in the Role Fit section.
 
 * Only PDF files are accepted (max 5 MB)
 * The upload is optional — the GitHub-only analysis still works without it
+
+---
+
+## Job Role Targeting
+
+Before analyzing, the user picks a **target job role** from the dropdown
+(Frontend Developer, ML Engineer, SRE, and 17 more). The analysis is then
+evaluated against that role and the report gains a **Role Fit** section:
+
+* a 0–100 match score for the selected role
+* strengths the GitHub profile shows for the role
+* "on GitHub but missing from your resume" hints — projects, skills and
+  achievements that are publicly visible but absent from the uploaded resume
+
+The user can then add those missing points to their own resume, increasing
+their chances of being selected — with zero fabrication, since everything
+suggested is backed by their public GitHub work.
 
 ---
 
@@ -212,14 +236,15 @@ skills, projects, and experience.
 
 1. User signs in with GitHub (the signed-in account is the analysis target)
 2. (Optional) User attaches a resume PDF — the backend extracts its text
-3. Frontend sends a request to the backend with the session token
-4. Backend resolves the GitHub username from the verified JWT
-5. GitHub profile and repository data are fetched and processed
-6. GitHub data (and resume text, if provided) is sent to Groq's LLM for evaluation
-7. AI generates score, summary, tech stack, activity insights, strengths,
-   weaknesses, improvements, and resume match
-8. Results are returned and displayed as a full-width report
-9. A snapshot is stored in MongoDB for progress comparison
+3. (Optional) User selects a target job role from the dropdown
+4. Frontend sends a request to the backend with the session token
+5. Backend resolves the GitHub username from the verified JWT
+6. GitHub profile and repository data are fetched and processed
+7. GitHub data (and resume text, if provided) is sent to Groq's LLM for evaluation
+8. AI generates score, summary, tech stack, activity insights, strengths,
+   weaknesses, improvements, resume match — and role fit when a role was selected
+9. Results are returned and displayed as a full-width report
+10. A snapshot is stored in MongoDB for progress comparison
 
 ---
 

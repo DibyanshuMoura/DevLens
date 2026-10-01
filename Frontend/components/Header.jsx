@@ -27,9 +27,10 @@ export const ThemeToggle = ({ isDark, onToggleTheme, className = "" }) => (
 const Header = ({ user, theme, onToggleTheme, onSignOut }) => {
   const isDark = theme === "dark";
   return (
-    <header className="sticky top-0 z-20 w-full bg-canvas/95 backdrop-blur px-4 sm:px-6 py-3 anim-fade-in">
+    <header className="sticky top-0 z-20 w-full px-3 sm:px-6 pt-3 anim-fade-in">
       <nav className="max-w-6xl mx-auto flex items-center justify-between gap-3
-        border border-edge bg-surface px-3 sm:px-4 py-2">
+        border border-edge bg-surface/40 backdrop-blur-md px-3 sm:px-4 py-2
+        shadow-lg shadow-black/10 dark:shadow-black/50">
 
         {/* Brand: lens glyph + wordmark */}
         <a href="#" className="group flex items-center gap-2.5 shrink-0">

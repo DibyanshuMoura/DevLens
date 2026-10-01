@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toPng } from "html-to-image";
 import HistoryPanel from "./HistoryPanel";
 import { getToken } from "../src/lib/auth";
 import { SkillIcon } from "../src/lib/skillIcons";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const Middle = ({ user, theme }) => {
   const isDark = theme === "dark";
@@ -18,6 +20,26 @@ const Middle = ({ user, theme }) => {
   const [history, setHistory] = useState([]);
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState("");
+  const [jobRole, setJobRole] = useState("");
+  const [roles, setRoles] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRoles() {
+      try {
+        const res = await fetch(`${API_URL}/roles`);
+        if (!res.ok) throw new Error("failed");
+        const { roles: list } = await res.json();
+        if (!cancelled) setRoles(list || []);
+      } catch {
+        if (!cancelled) setRoles([]);
+      }
+    }
+    loadRoles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,8 +118,8 @@ const Middle = ({ user, theme }) => {
       const dataUrl = await toPng(cardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
-        width: 1200,
-        height: 630,
+        width: 720,
+        height: 1000,
         backgroundColor: "#0a0a0a",
       });
       const a = document.createElement("a");
@@ -120,6 +142,7 @@ const Middle = ({ user, theme }) => {
 
       const formData = new FormData();
       if (resume) formData.append("resume", resume);
+      if (jobRole) formData.append("role", jobRole);
 
       const token = getToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
@@ -179,9 +202,9 @@ const Middle = ({ user, theme }) => {
   const score = typeof data?.res?.score === "number" ? data.res.score : null;
 
   return (
-    <main className="w-full flex-1 flex flex-col items-center px-6 gap-8 pb-6">
+    <main className="w-full flex-1 flex flex-col items-center px-6 gap-8 pt-6 pb-6">
       {/* CTA — no username input: the signed-in account is the target */}
-      <section className="w-full max-w-6xl flex flex-col items-center text-center mt-10 anim-fade-up">
+      <section className="w-full max-w-6xl flex flex-col items-center text-center mt-6 anim-fade-up">
         <p className="text-muted text-xs tracking-[0.25em] uppercase">
           analyzing {user?.login || "your profile"}
         </p>
@@ -231,6 +254,23 @@ const Middle = ({ user, theme }) => {
               />
             </label>
           )}
+
+          <select
+            value={jobRole}
+            onChange={(e) => setJobRole(e.target.value)}
+            disabled={loading || roles.length === 0}
+            aria-label="Target job role"
+            className="border border-edge bg-surface px-3 py-2.5 text-sm cursor-pointer
+              hover:border-ink focus:outline-none focus:border-ink disabled:opacity-60
+              disabled:cursor-not-allowed max-w-[240px] truncate"
+          >
+            <option value="">Target job role…</option>
+            {roles.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
 
           <button
             className="px-10 py-2.5 bg-ink text-on-ink hover:bg-ink/90 cursor-pointer
@@ -389,6 +429,72 @@ const Middle = ({ user, theme }) => {
             </section>
           )}
 
+          {/* Role fit — only shown when a job role was selected */}
+          {data.res?.roleFit && (
+            <section className="border border-edge bg-surface p-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <div>
+                  <h3 className="font-medium">
+                    Role Fit — {data.role || "target role"}
+                  </h3>
+                  <p className="text-muted text-xs mt-0.5">
+                    Add these to your resume to boost your chances for{" "}
+                    {data.role || "the selected role"}.
+                  </p>
+                </div>
+                {typeof data.res.roleFit.score === "number" && (
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-2xl font-bold tabular-nums">
+                      {data.res.roleFit.score}
+                      <span className="text-muted text-sm font-normal">/100</span>
+                    </span>
+                    <div className="h-1.5 w-28 bg-line overflow-hidden">
+                      <div
+                        className="score-bar-fill"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(0, data.res.roleFit.score),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {data.res.roleFit.summary && (
+                <p className="text-sm leading-relaxed mb-4">
+                  {data.res.roleFit.summary}
+                </p>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {data.res.roleFit.strengths?.length > 0 && (
+                  <div className="border border-line p-3">
+                    <p className="font-medium text-sm mb-2">
+                      Working in your favor
+                    </p>
+                    <ul className="list-disc pl-5 wrap-break-word text-sm space-y-1.5 text-muted">
+                      {render(data.res.roleFit.strengths)}
+                    </ul>
+                  </div>
+                )}
+                {data.res.roleFit.gaps?.length > 0 && (
+                  <div className="border border-line p-3">
+                    <p className="font-medium text-sm mb-2">
+                      On GitHub but missing from your resume
+                    </p>
+                    <ul className="list-disc pl-5 wrap-break-word text-sm space-y-1.5 text-muted">
+                      {render(data.res.roleFit.gaps)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+            </section>
+          )}
+
           {/* Top repositories */}
           {stats?.topRepos?.length > 0 && (
             <section className="border border-edge bg-surface p-5">
@@ -414,9 +520,9 @@ const Middle = ({ user, theme }) => {
             </section>
           )}
 
-          {/* Downloadable profile card */}
+          {/* Downloadable profile card — preview removed, export-only */}
           <section className="border border-edge bg-surface p-5">
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="font-medium">Profile Card</h3>
                 <p className="text-muted text-xs mt-0.5">
@@ -430,137 +536,190 @@ const Middle = ({ user, theme }) => {
                 className="bg-ink text-on-ink px-4 py-1.5 text-sm hover:bg-ink/90
                   cursor-pointer disabled:cursor-not-allowed transition-colors shrink-0"
               >
-                {exporting ? "Preparing…" : "Download PNG"}
+                {exporting ? "Preparing…" : "Download Card (PNG)"}
               </button>
             </div>
 
             {cardError && (
-              <p className="text-muted text-sm mb-3 anim-fade-in">{cardError}</p>
+              <p className="text-muted text-sm mt-3 anim-fade-in">{cardError}</p>
             )}
 
-            <div className="overflow-x-auto">
-              <div
+            {/* Export node — kept out of the visible layout so the card can
+                still be rendered to PNG without being previewed. */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: "fixed",
+                left: -12000,
+                top: 0,
+                pointerEvents: "none",
+              }}
+            >              <div
                 ref={cardRef}
-                className="flex flex-col justify-between shrink-0"
+                className="shrink-0"
                 style={{
-                  width: 1200,
-                  height: 630,
-                  padding: 48,
+                  width: 720,
+                  height: 1000,
+                  padding: "64px 56px",
                   background: "#0a0a0a",
                   color: "#fafafa",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                {/* Row 1: identity + score */}
-                <div className="flex items-start justify-between gap-10">
-                  <div className="flex items-center gap-6 min-w-0">
-                    <img
-                      src={data.dp}
-                      crossOrigin="anonymous"
-                      alt=""
-                      className="shrink-0 rounded-full"
-                      style={{ width: 96, height: 96, border: "2px solid #404040" }}
-                    />
-                    <div className="min-w-0">
-                      <p
-                        className="truncate font-bold"
-                        style={{ fontSize: 44, lineHeight: 1.1 }}
-                      >
-                        {data.name}
-                      </p>
-                      <p style={{ fontSize: 18, color: "#a3a3a3", marginTop: 8 }}>
-                        {data.id?.replace("https://", "")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p
-                      className="font-bold tabular-nums"
-                      style={{ fontSize: 96, lineHeight: 1 }}
-                    >
-                      {score ?? "–"}
-                    </p>
-                    <p
-                      className="uppercase"
-                      style={{
-                        fontSize: 13,
-                        color: "#a3a3a3",
-                        letterSpacing: "0.25em",
-                        marginTop: 8,
-                      }}
-                    >
-                      profile score
-                    </p>
-                  </div>
-                </div>
-
-                {/* Row 2: summary */}
-                <p
+                {/* Block 1: identity — photo top center */}
+                <div
                   style={{
-                    fontSize: 18,
-                    color: "#d4d4d4",
-                    lineHeight: 1.55,
-                    maxWidth: 940,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                   }}
                 >
-                  {data.res?.summary}
-                </p>
+                  <img
+                    src={data.dp}
+                    crossOrigin="anonymous"
+                    alt=""
+                    className="shrink-0 rounded-full"
+                    style={{ width: 200, height: 200, border: "3px solid #404040" }}
+                  />
+                  <p
+                    className="font-bold text-center"
+                    style={{
+                      fontSize: 44,
+                      lineHeight: 1.1,
+                      marginTop: 32,
+                      maxWidth: 560,
+                    }}
+                  >
+                    {data.name}
+                  </p>
+                  <p
+                    className="text-center"
+                    style={{
+                      fontSize: 17,
+                      lineHeight: 1.3,
+                      color: "#a3a3a3",
+                      marginTop: 10,
+                    }}
+                  >
+                    {data.id?.replace("https://", "")}
+                  </p>
+                </div>
 
-                {/* Row 3: tech stack chips */}
-                {data.res?.skills?.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {data.res.skills.slice(0, 6).map((s) => (
-                      <span
-                        key={s}
-                        className="text-sm"
+                {/* Block 2: tech stack + quote */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    width: "100%",
+                  }}
+                >
+                  {data.res?.skills?.length > 0 && (
+                    <>
+                      <p
+                        className="uppercase text-center"
                         style={{
-                          border: "1px solid #525252",
-                          color: "#e5e5e5",
-                          padding: "5px 12px",
+                          fontSize: 12,
+                          color: "#737373",
+                          letterSpacing: "0.3em",
                         }}
                       >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                        Tech Stack
+                      </p>
+                      <div
+                        className="flex flex-wrap justify-center"
+                        style={{
+                          gap: 12,
+                          marginTop: 18,
+                          width: "100%",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        {data.res.skills.slice(0, 6).map((s) => (
+                          <span
+                            key={s}
+                            style={{
+                              border: "1px solid #525252",
+                              color: "#e5e5e5",
+                              padding: "9px 16px",
+                              fontSize: 16,
+                              lineHeight: 1.2,
+                              whiteSpace: "nowrap",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {data.res?.quote && (
+                    <p
+                      className="text-center"
+                      style={{
+                        fontSize: 20,
+                        fontStyle: "italic",
+                        lineHeight: 1.55,
+                        color: "#d4d4d4",
+                        maxWidth: 520,
+                        marginTop: data.res?.skills?.length > 0 ? 44 : 0,
+                      }}
+                    >
+                      “{data.res.quote}”
+                    </p>
+                  )}
+                </div>
 
-                {/* Row 4: top repos */}
-                {stats?.topRepos?.length > 0 && (
-                  <p style={{ fontSize: 14, color: "#a3a3a3" }}>
-                    Top repos:{" "}
-                    {stats.topRepos
-                      .slice(0, 3)
-                      .map((r) => `${r.name} (★ ${fmt(r.stars)})`)
-                      .join("  ·  ")}
-                  </p>
-                )}
-
-                {/* Row 5: stats strip + credit */}
-                <div>
-                  <div
-                    className="grid grid-cols-6"
-                    style={{ borderTop: "1px solid #333", borderBottom: "1px solid #333" }}
+                {/* Block 3: stats + credit */}
+                <div style={{ width: "100%" }}>
+                  <p
+                    className="uppercase text-center"
+                    style={{
+                      fontSize: 12,
+                      color: "#737373",
+                      letterSpacing: "0.3em",
+                      marginBottom: 18,
+                    }}
                   >
-                    {statItems.map((s, i) => (
+                    Stats
+                  </p>
+                  <div
+                    className="grid grid-cols-3"
+                    style={{
+                      borderTop: "1px solid #333",
+                      borderBottom: "1px solid #333",
+                    }}
+                  >
+                    {statItems.slice(0, 6).map((s, i) => (
                       <div
                         key={s.label}
                         className="text-center"
                         style={{
-                          padding: "14px 0",
+                          padding: "20px 0",
                           borderRight:
-                            i < statItems.length - 1 ? "1px solid #262626" : "none",
+                            i % 3 < 2 ? "1px solid #262626" : "none",
+                          borderBottom:
+                            i < 3 ? "1px solid #262626" : "none",
                         }}
                       >
-                        <p className="font-bold tabular-nums" style={{ fontSize: 28 }}>
+                        <p
+                          className="font-bold tabular-nums"
+                          style={{ fontSize: 30, lineHeight: 1 }}
+                        >
                           {s.value}
                         </p>
                         <p
                           className="uppercase"
                           style={{
-                            fontSize: 11,
+                            fontSize: 12,
+                            lineHeight: 1.2,
                             color: "#a3a3a3",
                             letterSpacing: "0.15em",
-                            marginTop: 4,
+                            marginTop: 8,
                           }}
                         >
                           {s.label}
@@ -568,16 +727,20 @@ const Middle = ({ user, theme }) => {
                       </div>
                     ))}
                   </div>
-                  <div
-                    className="flex justify-between"
-                    style={{ fontSize: 13, color: "#a3a3a3", marginTop: 14 }}
+                  <p
+                    className="text-center"
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.3,
+                      color: "#a3a3a3",
+                      marginTop: 18,
+                    }}
                   >
-                    <span>
-                      Analyzed with{" "}
-                      <span style={{ color: "#fafafa", fontWeight: 700 }}>DevLens</span>
-                    </span>
-                    <span>{new Date().toLocaleDateString()}</span>
-                  </div>
+                    Analyzed with{" "}
+                    <span style={{ color: "#fafafa", fontWeight: 700 }}>DevLens</span>
+                    {" · "}
+                    {new Date().toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </div>

@@ -121,7 +121,7 @@ const reportMock = {
 const Landing = ({ onSignIn, theme }) => {
   const isDark = theme === "dark";
   return (
-    <section className="w-full max-w-4xl flex flex-col items-center text-center anim-cascade py-10 sm:py-16">
+    <section className="w-full max-w-4xl flex flex-col items-center text-center anim-cascade pt-2 pb-10 sm:pb-16">
       {/* Hero */}          <p className="text-muted text-xs sm:text-sm tracking-[0.25em] uppercase">
         AI-powered GitHub analysis
       </p>
