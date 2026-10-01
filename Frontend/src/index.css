@@ -1,5 +1,238 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Theme tokens ---------- */
+:root {
+  color-scheme: light;
+  --c-canvas: #e6e6e6;
+  --c-surface: #e6e6e6;
+  --c-ink: #000000;
+  --c-on-ink: #ffffff;
+  --c-muted: #6b7280;
+  --c-faint: #9ca3af;
+  --c-line: #d1d5db;
+  --c-line-2: #e5e7eb;
+  --c-line-strong: #9ca3af;
+  --c-edge: #000000;
+}
+
+html.dark {
+  color-scheme: dark;
+  --c-canvas: #111111;
+  --c-surface: #1a1a1a;
+  --c-ink: #f5f5f5;
+  --c-on-ink: #111111;
+  --c-muted: #a3a3a3;
+  --c-faint: #737373;
+  --c-line: #333333;
+  --c-line-2: #2a2a2a;
+  --c-line-strong: #525252;
+  --c-edge: #444444;
+}
+
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-ink: var(--c-ink);
+  --color-on-ink: var(--c-on-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-line: var(--c-line);
+  --color-line-2: var(--c-line-2);
+  --color-line-strong: var(--c-line-strong);
+  --color-edge: var(--c-edge);
+}
+
+body {
+  background: var(--c-canvas);
+  color: var(--c-ink);
+}
+
 * {
   font-family: "JetBrainsMono Nerd Font", monospace;
+}
+
+/* ---------- Keyframes ---------- */
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  70% {
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-border {
+  0%,
+  100% {
+    border-color: var(--c-edge);
+  }
+  50% {
+    border-color: var(--c-line-strong);
+  }
+}
+
+/* ---------- Animation utility classes ---------- */
+
+.anim-fade-up {
+  animation: fade-slide-up 0.45s ease-out both;
+}
+
+.anim-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+.anim-pop-in {
+  animation: pop-in 0.35s ease-out both;
+}
+
+/* Results card children fade in with a soft cascade */
+.anim-cascade > * {
+  animation: fade-slide-up 0.45s ease-out both;
+}
+
+.anim-cascade > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.anim-cascade > *:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.anim-cascade > *:nth-child(3) {
+  animation-delay: 0.19s;
+}
+.anim-cascade > *:nth-child(4) {
+  animation-delay: 0.26s;
+}
+.anim-cascade > *:nth-child(5) {
+  animation-delay: 0.33s;
+}
+.anim-cascade > *:nth-child(6) {
+  animation-delay: 0.4s;
+}
+.anim-cascade > *:nth-child(7) {
+  animation-delay: 0.47s;
+}
+.anim-cascade > *:nth-child(8) {
+  animation-delay: 0.54s;
+}
+
+/* Score bar fills from left on mount */
+.score-bar-fill {
+  height: 100%;
+  background: var(--c-ink);
+  transform-origin: left;
+  animation: grow-x 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* List items slide in one after another */
+.anim-stagger li {
+  animation: fade-slide-up 0.35s ease-out both;
+}
+
+.anim-stagger li:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.anim-stagger li:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.anim-stagger li:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Shimmering underline shown while loading */
+.loading-bar {
+  position: relative;
+  height: 2px;
+  width: 160px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--c-line);
+}
+
+.loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 50%;
+  background: var(--c-ink);
+  animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+/* ---------- Micro-interactions ---------- */
+
+/* Smooth focus / hover transitions everywhere */
+input,
+button {
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+/* Input: border darkens gently while the user types focus */
+.focus-glow:focus-within,
+input:focus {
+  animation: pulse-border 1.6s ease-in-out infinite;
+}
+
+/* Button press feedback */
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

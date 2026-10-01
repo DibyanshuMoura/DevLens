@@ -1,21 +1,136 @@
+// Must be first: ESM evaluates imports before module bodies, so env vars
+// have to load during import — not later via dotenv.config().
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
+import multer from "multer";
+import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
+import { PDFParse } from "pdf-parse";
+import authRouter from "./auth.js";
+import { appendSnapshot } from "./history.js";
+import { connectDB } from "./db.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(cors());
 
-app.get("/analyze", async (req, res) => {
-  try {
-    const username = req.query.username;
-    if (!username) {
-      return res.status(400).json({ message: "Username is required" });
+app.use("/auth", authRouter);
+
+// Keep uploads in memory only — nothing is written to disk.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed"));
     }
+  },
+});
+
+const MAX_RESUME_CHARS = 6000;
+
+async function extractResumeText(file) {
+  const parser = new PDFParse({ data: file.buffer });
+  try {
+    const result = await parser.getText();
+    // Collapse whitespace and drop pdf-parse's "-- 1 of 3 --" page markers
+    // so the LLM prompt stays compact and readable.
+    return result.text
+      .replace(/--\s*\d+\s*of\s*\d+\s*--/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_RESUME_CHARS);
+  } finally {
+    await parser.destroy();
+  }
+}
+
+function buildPrompt(userData, resumeText) {
+  const resumeSection = resumeText
+    ? `
+  Candidate Resume (text extracted from uploaded PDF):
+  """
+  ${resumeText}
+  """
+
+  Use the resume for additional context about the candidate's skills,
+  projects, and experience. Combine it with the GitHub data, and keep
+  every point factual — do not invent anything that is not supported by
+  the GitHub data or the resume. Fill "resumeMatch" with 3 short points
+  about where the resume and GitHub activity agree or contradict each other.
+  `
+    : "";
+
+  return `
+  You are a senior engineering recruiter and GitHub profile analyzer.
+
+  Analyze the following GitHub statistics and generate a concise evaluation.
+
+  GitHub Data:
+  ${JSON.stringify(userData)}
+  ${resumeSection}
+  STRICT RULES:
+  - Return ONLY valid JSON
+  - Do not include markdown
+  - Do not include explanation text
+  - Do not wrap response in backticks
+  - Do not add intro or outro
+  - Keep responses factual based ONLY on provided data
+  - Do not hallucinate technologies, experience, or achievements
+
+  Field rules:
+  - "summary": one or two plain sentences describing this developer
+  - "score": integer 0-100 rating overall profile strength
+  - "skills": array of up to 6 concrete technologies evident from the data
+  - "activity": exactly 3 objects, each {"title": short label, "detail": one sentence}
+  - "strengths", "weaknesses", "improvements": each exactly 3 short bullet points
+  - "resumeMatch": 3 short bullet points when a resume is provided, otherwise []
+
+  Expected JSON format:
+
+  {
+    "summary": "sentence",
+    "score": 75,
+    "skills": ["skill", "skill"],
+    "activity": [
+      { "title": "label", "detail": "sentence" },
+      { "title": "label", "detail": "sentence" },
+      { "title": "label", "detail": "sentence" }
+    ],
+    "strengths": [
+      "point",
+      "point",
+      "point"
+    ],
+    "weaknesses": [
+      "point",
+      "point",
+      "point"
+    ],
+    "improvements": [
+      "point",
+      "point",
+      "point"
+    ],
+    "resumeMatch": [
+      "point",
+      "point",
+      "point"
+    ]
+  }
+  `;
+}
+
+async function analyzeProfile(req, res, username, resumeText) {
+  try {
     const resp = await fetch(`https://api.github.com/users/${username}`);
     if (!resp.ok) {
       return res.status(404).json({
@@ -31,61 +146,41 @@ app.get("/analyze", async (req, res) => {
 
     let stars = 0,
       langs = {},
-      active = 0;
+      active = 0,
+      forks = 0;
+
+    const ranked = [...repos].sort(
+      (a, b) => b.stargazers_count - a.stargazers_count,
+    );
 
     repos.forEach((r) => {
       stars += r.stargazers_count;
+      forks += r.forks_count;
       if (r.language) langs[r.language] = (langs[r.language] || 0) + 1;
       if (new Date() - new Date(r.updated_at) < 30 * 86400000) active++;
     });
+
+    const accountAgeYears =
+      (Date.now() - new Date(user.created_at)) / (365.25 * 86400000);
 
     const userData = {
       username: user.login,
       repos: user.public_repos,
       followers: user.followers,
       stars,
+      forks,
+      accountAgeYears: Number(accountAgeYears.toFixed(1)),
       languages: Object.keys(langs).slice(0, 3),
       activeRepos: active,
+      topRepos: ranked.slice(0, 3).map((r) => ({
+        name: r.name,
+        stars: r.stargazers_count,
+        language: r.language,
+      })),
     };
 
-    const prompt = `
-  You are a GitHub profile analyzer.
+    const prompt = buildPrompt(userData, resumeText);
 
-  Analyze the following GitHub statistics and generate a concise evaluation.
-
-  GitHub Data:
-  ${JSON.stringify(userData)}
-
-  STRICT RULES:
-  - Return ONLY valid JSON
-  - Do not include markdown
-  - Do not include explanation text
-  - Do not wrap response in backticks
-  - Do not add intro or outro
-  - Every field must contain exactly 3 short bullet points
-  - Keep responses factual based ONLY on provided data
-  - Do not hallucinate technologies, experience, or achievements
-
-  Expected JSON format:
-
-  {
-    "strengths": [
-      "point",
-      "point",
-      "point"
-    ],
-    "weaknesses": [
-      "point",
-      "point",
-      "point"
-    ],
-    "improvements": [
-      "point",
-      "point",
-      "point"
-    ]
-  }
-  `;
     if (!process.env.GROQ_API_KEY) {
       throw new Error("Groq API key is missing");
     }
@@ -98,7 +193,7 @@ app.get("/analyze", async (req, res) => {
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
+          model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
           response_format: {
             type: "json_object",
           },
@@ -128,11 +223,58 @@ app.get("/analyze", async (req, res) => {
         message: "AI returned invalid JSON",
       });
     }
+    // Snapshot for the signed-in user's history/comparison view.
+    // The JWT is verified defensively — analysis still succeeds for
+    // anonymous users even if the session is expired or absent.
+    let signedInUser = null;
+    try {
+      const header = req.headers.authorization || "";
+      const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+      if (token && process.env.JWT_SECRET) {
+        signedInUser = jwt.verify(token, process.env.JWT_SECRET);
+      }
+    } catch {
+      signedInUser = null;
+    }
+
+    if (signedInUser) {
+      try {
+        await appendSnapshot(signedInUser, {
+          username: userData.username,
+          score: parsed.score,
+          repos: userData.repos,
+          followers: user.followers,
+          stars,
+          forks,
+          activeRepos: active,
+          skills: parsed.skills || [],
+        });
+      } catch (err) {
+        console.error("Snapshot failed:", err.message);
+      }
+    }
+
     res.status(200).json({
       dp: user.avatar_url,
       name: user.login,
       id: user.html_url,
       res: parsed,
+      hasResume: Boolean(resumeText),
+      stats: {
+        repos: user.public_repos,
+        followers: user.followers,
+        stars,
+        forks,
+        activeRepos: active,
+        accountAgeYears: Number(accountAgeYears.toFixed(1)),
+        languages: userData.languages,
+        topRepos: ranked.slice(0, 5).map((r) => ({
+          name: r.name,
+          stars: r.stargazers_count,
+          language: r.language,
+          url: r.html_url,
+        })),
+      },
     });
   } catch (error) {
     console.error(error);
@@ -140,6 +282,78 @@ app.get("/analyze", async (req, res) => {
       message: error.message || "Internal server error",
     });
   }
+}
+
+// When OAuth is configured the analyzer is members-only. Without OAuth
+// credentials the endpoint stays open (self-host / demo friendly).
+function requireSignedIn(req, res, next) {
+  const authReady = Boolean(
+    process.env.GITHUB_CLIENT_ID &&
+      process.env.GITHUB_CLIENT_SECRET &&
+      process.env.JWT_SECRET,
+  );
+  if (!authReady) return next();
+
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Sign in with GitHub to analyze profiles" });
+  }
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    return res
+      .status(401)
+      .json({ message: "Session expired — sign in again" });
+  }
+}
+
+app.get("/analyze", requireSignedIn, (req, res) => {
+  const username = req.query.username;
+  if (!username) {
+    return res.status(400).json({ message: "Username is required" });
+  }
+  analyzeProfile(req, res, username, "");
 });
+
+app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) => {
+  // Signed-in users don't type a username — default to their own login
+  // from the verified JWT.
+  const username = (req.body?.username || req.user?.login || "").trim();
+  if (!username) {
+    return res.status(400).json({ message: "Username is required" });
+  }
+
+  let resumeText = "";
+  if (req.file) {
+    try {
+      resumeText = await extractResumeText(req.file);
+    } catch (error) {
+      console.error("Resume extraction failed:", error.message);
+      return res.status(400).json({
+        message: "Could not read the PDF. Is it a valid resume file?",
+      });
+    }
+  }
+
+  analyzeProfile(req, res, username.trim(), resumeText);
+});
+
+// Multer errors (file too large, wrong type, etc.) land here as JSON.
+app.use((err, _req, res, _next) => {
+  res.status(400).json({
+    message: err.message || "Upload failed",
+  });
+});
+
+try {
+  await connectDB();
+} catch (err) {
+  console.error("Failed to connect to MongoDB:", err.message);
+  process.exit(1);
+}
 
 app.listen(port);
