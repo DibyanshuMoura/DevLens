@@ -17,7 +17,7 @@ function plot(snapshots, series) {
       Math.max(
         ...snapshots
           .map((snap) => snap[s.key])
-          .filter((v) => typeof v === "number"),
+          .filter((v) => typeof v === "number" && Number.isFinite(v)),
         1,
       ),
     ];
@@ -26,7 +26,7 @@ function plot(snapshots, series) {
 
     const points = snapshots
       .map((snap, i) => ({ i, v: snap[s.key] }))
-      .filter(({ v }) => typeof v === "number");
+      .filter(({ v }) => typeof v === "number" && Number.isFinite(v));
     if (points.length < 2) return null;
 
     const path = points
@@ -67,7 +67,9 @@ const ScoreTrend = ({ snapshots = [] }) => {
   if (snapshots.length < 2) return null;
 
   const available = SERIES.filter((s) =>
-    snapshots.some((snap) => typeof snap[s.key] === "number"),
+    snapshots.some(
+      (snap) => typeof snap[s.key] === "number" && Number.isFinite(snap[s.key]),
+    ),
   );
   if (available.length === 0) return null;
 
@@ -100,14 +102,18 @@ const ScoreTrend = ({ snapshots = [] }) => {
                 }`}
               />
               {s.label}
-              {typeof last[s.key] === "number" && ` · ${last[s.key]}`}
+              {typeof last[s.key] === "number" &&
+                Number.isFinite(last[s.key]) &&
+                ` · ${last[s.key]}`}
             </span>
           ))}
         </div>
         <span className="text-xs text-muted">
           {snapshots.length} runs
           {typeof last.score === "number" &&
+            Number.isFinite(last.score) &&
             typeof first.score === "number" &&
+            Number.isFinite(first.score) &&
             ` · score ${last.score >= first.score ? "+" : ""}${last.score - first.score}`}
         </span>
       </div>

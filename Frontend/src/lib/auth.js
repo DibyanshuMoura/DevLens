@@ -1,5 +1,13 @@
 const TOKEN_KEY = "devlens_token";
 
+export function decodeJwtPayload(token) {
+  const segment = token.split(".")[1];
+  if (!segment) throw new Error("Malformed token");
+  const base64 = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  return JSON.parse(atob(padded));
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -19,11 +27,33 @@ export async function fetchMe() {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error("unauthorized");
+    if (res.status === 401 || res.status === 403) {
+      clearToken();
+      return null;
+    }
+    if (!res.ok) return undefined;
     const { user } = await res.json();
-    return user;
+    return user ?? null;
   } catch {
-    clearToken();
+    return undefined;
+  }
+}
+
+export function readCachedUser() {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = decodeJwtPayload(token);
+    if (payload.exp && payload.exp * 1000 <= Date.now()) {
+      clearToken();
+      return null;
+    }
+    return {
+      login: payload.login,
+      avatar: payload.avatar,
+      profile: payload.profile,
+    };
+  } catch {
     return null;
   }
 }
@@ -57,8 +87,13 @@ export function consumeTokenFromUrl() {
     `${window.location.pathname}${qs ? `?${qs}` : ""}`,
   );
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return { login: payload.login, avatar: payload.avatar, profile: payload.profile };
+    const payload = decodeJwtPayload(token);
+    if (payload.exp && payload.exp * 1000 <= Date.now()) return null;
+    return {
+      login: payload.login,
+      avatar: payload.avatar,
+      profile: payload.profile,
+    };
   } catch {
     return null;
   }

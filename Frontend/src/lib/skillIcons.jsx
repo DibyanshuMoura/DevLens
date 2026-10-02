@@ -82,7 +82,7 @@ const strip = (s) => s.replace(/[\s.+#&/()]/g, "");
 const siUrl = (slug, isDark) =>
   `https://cdn.simpleicons.org/${slug}/${isDark ? "f5f5f5" : "000000"}`;
 
-export const skillIcon = (skill, isDark) => {
+const skillIcon = (skill, isDark) => {
   const norm = normalize(skill);
   if (!norm) return null;
   const stripped = strip(norm);

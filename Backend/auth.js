@@ -8,31 +8,83 @@ const router = express.Router();
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
-const APP_URL =
-  process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-const JWT_SECRET = process.env.JWT_SECRET || "";
 const TOKEN_TTL = "7d";
+const JWT_SECRET = process.env.JWT_SECRET || "";
+
+export function normalizeOrigin(value, fallback) {
+  const raw = String(value || fallback).trim().replace(/\/+$/, "");
+  const explicitScheme = /^https?:\/\//i.exec(raw);
+  const host = explicitScheme ? raw.slice(explicitScheme[0].length) : raw;
+
+  const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host);
+  if (isLocalHost) return `http://${host}`;
+
+  return `https://${host}`;
+}
+
+const APP_URL = normalizeOrigin(
+  process.env.APP_URL,
+  `localhost:${process.env.PORT || 3000}`,
+);
+const IS_HTTPS = APP_URL.startsWith("https://");
+const FRONTEND_URL = normalizeOrigin(
+  process.env.FRONTEND_URL,
+  "localhost:5173",
+);
 
 function authConfigured() {
   return Boolean(CLIENT_ID && CLIENT_SECRET && JWT_SECRET);
 }
 
-function requireAuth(req, res, next) {
+function readBearerToken(req) {
+  const header = req.headers.authorization || "";
+  return header.startsWith("Bearer ") ? header.slice(7) : null;
+}
+
+function verifySession(req) {
+  const token = readBearerToken(req);
+  if (!token) return { ok: false, reason: "missing" };
+  try {
+    return { ok: true, user: jwt.verify(token, JWT_SECRET) };
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+}
+
+export function requireAuth(req, res, next) {
   if (!authConfigured()) {
     return res.status(503).json({ message: "Login is not configured" });
   }
-  const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token) {
-    return res.status(401).json({ message: "Not signed in" });
+  const session = verifySession(req);
+  if (!session.ok) {
+    return res
+      .status(401)
+      .json({
+        message:
+          session.reason === "missing"
+            ? "Not signed in"
+            : "Session expired — sign in again",
+      });
   }
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch {
-    return res.status(401).json({ message: "Session expired — sign in again" });
+  req.user = session.user;
+  next();
+}
+
+export function requireSignedIn(req, res, next) {
+  if (!authConfigured()) return next();
+  const session = verifySession(req);
+  if (!session.ok) {
+    return res
+      .status(401)
+      .json({
+        message:
+          session.reason === "missing"
+            ? "Sign in with GitHub to analyze profiles"
+            : "Session expired — sign in again",
+      });
   }
+  req.user = session.user;
+  next();
 }
 
 router.get("/config", (_req, res) => {
@@ -51,6 +103,7 @@ router.get("/github", (req, res) => {
   res.cookie("oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",
+    secure: IS_HTTPS,
     maxAge: 10 * 60 * 1000,
   });
   const params = new URLSearchParams({

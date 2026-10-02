@@ -3,9 +3,8 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import cookieParser from "cookie-parser";
-import jwt from "jsonwebtoken";
 import { PDFParse } from "pdf-parse";
-import authRouter from "./auth.js";
+import authRouter, { requireSignedIn } from "./auth.js";
 import { appendSnapshot } from "./history.js";
 import {
   saveAnalysis,
@@ -389,18 +388,8 @@ async function recordSnapshot(user, payload, activity, quality) {
   }
 }
 
-function readSession(req) {
-  try {
-    const header = req.headers.authorization || "";
-    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-    if (token && process.env.JWT_SECRET) return jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
-  }
-  return null;
-}
-
 async function analyzeProfile(req, res, username, resumeText, jobRole) {
-  const signedInUser = readSession(req);
+  const signedInUser = req.user || null;
   try {
     const payload = await buildAnalysis(username, resumeText, jobRole);
 
@@ -612,31 +601,6 @@ app.post(
     }
   },
 );
-
-function requireSignedIn(req, res, next) {
-  const authReady = Boolean(
-    process.env.GITHUB_CLIENT_ID &&
-      process.env.GITHUB_CLIENT_SECRET &&
-      process.env.JWT_SECRET,
-  );
-  if (!authReady) return next();
-
-  const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token) {
-    return res
-      .status(401)
-      .json({ message: "Sign in with GitHub to analyze profiles" });
-  }
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    return res
-      .status(401)
-      .json({ message: "Session expired — sign in again" });
-  }
-}
 
 app.get("/analyze", requireSignedIn, (req, res) => {
   const username = req.query.username;

@@ -5,7 +5,7 @@ import ProfileReport from "./report/ProfileReport";
 import ProfileHeader from "./report/ProfileHeader";
 import StatsStrip from "./report/StatsStrip";
 import RoleFit from "./report/RoleFit";
-import ActivityHeatmap from "./report/ActivityHeatmap";
+import ReportSkeleton, { ControlsSkeleton } from "./report/ReportSkeleton";
 import { useAnalysis } from "../src/hooks/useAnalysis";
 import { useMatch } from "../src/hooks/useMatch";
 import { useHistory } from "../src/hooks/useHistory";
@@ -13,34 +13,6 @@ import { useCommitActivity } from "../src/hooks/useCommitActivity";
 
 const PDF = "application/pdf";
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
-
-const ActivitySkeleton = () => (
-  <div className="w-full max-w-6xl border border-edge bg-surface p-5 overflow-hidden anim-rise">
-    <div className="h-4 w-40 skeleton rounded-none" />
-    <div className="grid grid-cols-5 gap-3 mt-4">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div key={i} className="h-12 skeleton" />
-      ))}
-    </div>
-    <div className="w-full min-w-[620px] mt-5 overflow-hidden">
-      <div className="flex flex-col gap-[2px]">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d} className="flex items-center">
-            <span className="w-7 shrink-0 text-[9px] text-muted pr-1 text-right">
-              {d}
-            </span>
-            {Array.from({ length: 53 }, (_, w) => (
-              <span
-                key={w}
-                className="flex-1 min-w-0 aspect-square border border-line skeleton"
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
 
 const PROMO = [
   [
@@ -74,7 +46,7 @@ const Middle = ({ user, theme }) => {
     error: matchError,
     match,
   } = useMatch();
-  const { activity, loading: activityLoading, error: activityError } =
+  const { loading: activityLoading, error: activityError } =
     useCommitActivity(user?.login);
   const [fileError, setFileError] = useState("");
   const { history, clearing, error: historyError, clear } = useHistory(
@@ -107,20 +79,36 @@ const Middle = ({ user, theme }) => {
 
   return (
     <main className="w-full flex-1 flex flex-col items-center px-4 sm:px-6 gap-5 sm:gap-6 pt-5 sm:pt-6 pb-4">
-      {
-}
-      {!data && user && (activity || activityLoading) && (
-        <ActivityHeatmap
-          activity={activity}
-          title="Your Commit Activity"
-          className="w-full max-w-6xl"
-        />
-      )}
-
-      {!data && activityLoading && (
-        <div className="w-full max-w-6xl flex justify-center">
-          <ActivitySkeleton />
-        </div>
+      {!data && user && loading && !error && (
+        <>
+          <div
+            className="w-full max-w-6xl flex flex-col gap-6"
+            aria-busy="true"
+          >
+            <div className="border border-edge bg-surface p-5 flex flex-col sm:flex-row items-center gap-5">
+              <span className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-edge skeleton shrink-0" />
+              <div className="flex-1 w-full min-w-0 flex flex-col gap-2">
+                <span className="h-7 w-48 skeleton" />
+                <span className="h-3.5 w-full max-w-md skeleton" />
+                <span className="h-3.5 w-2/3 max-w-sm skeleton" />
+              </div>
+              <div className="hidden sm:flex flex-col items-end gap-2 shrink-0">
+                <span className="h-9 w-20 skeleton" />
+                <span className="h-2.5 w-32 skeleton" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-line border border-line">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="bg-surface p-3">
+                  <span className="block h-6 w-10 mx-auto skeleton" />
+                  <span className="block h-2.5 w-12 mx-auto mt-2 skeleton" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <ControlsSkeleton />
+          <ReportSkeleton />
+        </>
       )}
 
       {user && !data && !activityLoading && activityError && (
@@ -165,7 +153,7 @@ const Middle = ({ user, theme }) => {
       )}
 
       {loading && !data && (
-        <p className="text-muted text-sm anim-fade-in">
+        <p className="text-muted text-sm anim-fade-in w-full max-w-6xl text-center">
           Analyzing your profile — this runs once and is then saved…
         </p>
       )}

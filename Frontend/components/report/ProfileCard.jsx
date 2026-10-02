@@ -25,7 +25,7 @@ const ProfileCard = ({ data }) => {
   ].map((s) => ({
     ...s,
     value:
-      typeof s.value === "number" && s.value >= 1000
+      typeof s.value === "number" && Number.isFinite(s.value) && s.value >= 1000
         ? `${(s.value / 1000).toFixed(1).replace(/\.0$/, "")}k`
         : String(s.value ?? "–"),
   }));

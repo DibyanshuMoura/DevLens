@@ -22,6 +22,9 @@ export function useHistory(reloadKey) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!getToken()) {
+      return undefined;
+    }
     fetchHistory()
       .then(({ snapshots }) => {
         if (!cancelled) setHistory(snapshots || []);

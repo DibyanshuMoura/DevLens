@@ -16,8 +16,11 @@ const RoadmapItem = ({ item }) => {
       )}
       {item.skills?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5">
-          {item.skills.map((s) => (
-            <span key={s} className="border border-line px-1.5 py-0.5 text-[10px]">
+          {item.skills.map((s, i) => (
+            <span
+              key={`${s}-${i}`}
+              className="border border-line px-1.5 py-0.5 text-[10px] wrap-break-word"
+            >
               {s}
             </span>
           ))}
@@ -35,7 +38,7 @@ const RoleFit = ({ role, fit, className = "" }) => {
     <Panel
       title={`Role Fit — ${label}`}
       description={`Add these to your resume to boost your chances for ${label}.`}
-      className={className}
+      className={`anim-rise-in ${className}`}
       actions={
         typeof fit.score === "number" ? (
           <ScoreMeter

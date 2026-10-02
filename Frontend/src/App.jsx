@@ -8,14 +8,22 @@ import {
   fetchMe,
   consumeTokenFromUrl,
   authErrorMessage,
+  readCachedUser,
 } from "./lib/auth";
 
+function bootstrap() {
+  const err = authErrorMessage();
+  const user = consumeTokenFromUrl() ?? readCachedUser();
+  return { user, err };
+}
+
 const App = () => {
-  const [user, setUser] = useState(null);
-  const [authError, setAuthError] = useState(null);
+  const [session, setSession] = useState(bootstrap);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("devlens-theme") || "light",
   );
+  const { user: initialUser } = session;
+  const [user, setUser] = useState(initialUser);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -24,15 +32,18 @@ const App = () => {
   }, [theme]);
 
   useEffect(() => {
-    const urlUser = consumeTokenFromUrl();
-    if (urlUser) {
-      setUser(urlUser);
-      return;
-    }
-    const err = authErrorMessage();
-    if (err) setAuthError(err);
-    fetchMe().then(setUser);
-  }, []);
+    let cancelled = false;
+
+    (async () => {
+      const me = initialUser ?? (await fetchMe());
+      if (cancelled || me === undefined) return;
+      setUser(me);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialUser]);
 
   const handleSignIn = () => {
     window.location.href = `${import.meta.env.VITE_API_URL}/auth/github`;
@@ -40,6 +51,7 @@ const App = () => {
 
   const handleSignOut = () => {
     clearToken();
+    setSession({ user: null, err: null });
     setUser(null);
   };
 
@@ -49,9 +61,9 @@ const App = () => {
 
   return (
     <div className="w-full min-h-screen bg-canvas flex flex-col">
-      {authError && (
+      {session.err && (
         <p className="bg-ink text-on-ink text-sm text-center py-2 px-4 anim-fade-in">
-          {authError}
+          {session.err}
         </p>
       )}
 

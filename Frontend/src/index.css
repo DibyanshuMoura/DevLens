@@ -146,6 +146,12 @@ body {
 .anim-cascade > *:nth-child(8) {
   animation-delay: 0.54s;
 }
+.anim-cascade > *:nth-child(9) {
+  animation-delay: 0.61s;
+}
+.anim-cascade > *:nth-child(10) {
+  animation-delay: 0.68s;
+}
 
 .score-bar-fill {
   height: 100%;
@@ -163,18 +169,42 @@ body {
   }
 }
 
-.anim-stagger li {
+.anim-stagger > * {
   animation: fade-slide-up 0.35s ease-out both;
 }
 
-.anim-stagger li:nth-child(1) {
-  animation-delay: 0.1s;
+.anim-rise-in {
+  animation: fade-slide-up 0.45s var(--ease-out) both;
+}.anim-stagger > * {
+  animation-delay: calc(var(--stagger-i, 0) * 0.07s);
 }
-.anim-stagger li:nth-child(2) {
-  animation-delay: 0.2s;
+
+.anim-stagger > *:nth-child(1) {
+  --stagger-i: 1;
 }
-.anim-stagger li:nth-child(3) {
-  animation-delay: 0.3s;
+
+.anim-stagger > *:nth-child(2) {
+  --stagger-i: 2;
+}
+
+.anim-stagger > *:nth-child(3) {
+  --stagger-i: 3;
+}
+
+.anim-stagger > *:nth-child(4) {
+  --stagger-i: 4;
+}
+
+.anim-stagger > *:nth-child(5) {
+  --stagger-i: 5;
+}
+
+.anim-stagger > *:nth-child(6) {
+  --stagger-i: 6;
+}
+
+.anim-stagger > *:nth-child(n + 7) {
+  --stagger-i: 6;
 }
 
 .loading-bar {

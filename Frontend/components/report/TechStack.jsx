@@ -5,9 +5,9 @@ const TechStack = ({ skills = [], languages = [], isDark }) => (
   <Panel title="Tech Stack">
     {skills.length > 0 ? (
       <div className="flex flex-wrap gap-2">
-        {skills.map((s) => (
+        {skills.map((s, i) => (
           <span
-            key={s}
+            key={`${s}-${i}`}
             className="inline-flex items-center gap-1.5 border border-edge px-2.5 py-1 text-sm anim-pop-in press"
           >
             <SkillIcon skill={s} isDark={isDark} />

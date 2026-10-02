@@ -30,7 +30,7 @@ export const ScoreMeter = ({
   caption = "",
   size = "text-4xl",
 }) => {
-  const hasValue = typeof value === "number";
+  const hasValue = typeof value === "number" && Number.isFinite(value);
   const pct = hasValue ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
   return (
     <div className="flex flex-col items-end gap-1 shrink-0">

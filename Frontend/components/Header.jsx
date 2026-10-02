@@ -27,9 +27,10 @@ export const ThemeToggle = ({ isDark, onToggleTheme, className = "" }) => (
 const Header = ({ theme, onToggleTheme, onSignOut }) => {
   const isDark = theme === "dark";
   return (
-    <header className="sticky top-0 z-20 w-full px-3 sm:px-6 pt-3 anim-fade-in">
+    <header className="sticky top-0 z-20 w-full px-3 sm:px-6 pt-3">
       <nav className="max-w-6xl mx-auto flex items-center justify-between gap-3
-        border border-edge bg-surface/40 backdrop-blur-md px-3 sm:px-4 py-2
+        border border-edge bg-surface/70 backdrop-blur-xl backdrop-saturate-150
+        px-3 sm:px-4 py-2 anim-fade-in
         shadow-lg shadow-black/10 dark:shadow-black/50">
 
         {}
