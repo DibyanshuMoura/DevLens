@@ -35,7 +35,6 @@ function requireAuth(req, res, next) {
   }
 }
 
-/** Frontend asks this first so the UI can hide/show the login button. */
 router.get("/config", (_req, res) => {
   res.json({
     enabled: authConfigured(),
@@ -44,7 +43,6 @@ router.get("/config", (_req, res) => {
   });
 });
 
-/** Step 1: send the browser to GitHub's authorize page. */
 router.get("/github", (req, res) => {
   if (!authConfigured()) {
     return res.redirect(`${FRONTEND_URL}/?authError=${encodeURIComponent("Login is not configured")}`);
@@ -64,7 +62,6 @@ router.get("/github", (req, res) => {
   res.redirect(`https://github.com/login/oauth/authorize?${params}`);
 });
 
-/** Step 2: GitHub calls back with a code; swap it for a user. */
 router.get("/github/callback", async (req, res) => {
   const { code, state } = req.query;
   try {
@@ -102,7 +99,6 @@ router.get("/github/callback", async (req, res) => {
     }
     const ghUser = await userRes.json();
 
-    // Persist the account (source of truth lives in MongoDB, not the JWT).
     await User.findOneAndUpdate(
       { githubId: ghUser.id },
       {
@@ -139,12 +135,10 @@ router.get("/github/callback", async (req, res) => {
   }
 });
 
-/** Who am I? Used to revalidate a stored token on page load. */
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
-/** Analysis history for the signed-in user. */
 router.get("/history", requireAuth, async (req, res) => {
   try {
     const snapshots = await getHistory(req.user);
@@ -155,7 +149,6 @@ router.get("/history", requireAuth, async (req, res) => {
   }
 });
 
-/** Wipe all snapshots for the signed-in user. */
 router.delete("/history", requireAuth, async (req, res) => {
   try {
     const cleared = await clearHistory(req.user);

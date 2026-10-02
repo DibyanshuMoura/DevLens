@@ -1,24 +1,12 @@
-// Small brand glyphs for the Tech Stack chips.
-//
-// "si" entries are Simple Icons served from their CDN and recolored through
-// the URL (pure monochrome, matches the active theme's ink token).
-// "dev" entries are Devicon SVGs drawn as a CSS mask filled with currentColor,
-// so they also follow the theme. Any URL that fails to load is hidden by the
-// onError handler in SkillIcon — unknown skills simply show their text.
-
 const SI = (slug) => ({ si: slug });
 const DEV = (path) => ({ dev: path });
 
-// Keys are checked first as normalized text ("c++"), then stripped of
-// spacing/punctuation ("node.js" -> "nodejs").
 const TABLE = {
-  // symbols
   "c++": SI("cplusplus"),
   "c#": DEV("csharp/csharp-plain"),
   "f#": SI("fsharp"),
   ".net": SI("dotnet"),
 
-  // languages
   js: SI("javascript"),
   es6: SI("javascript"),
   ts: SI("typescript"),
@@ -34,7 +22,6 @@ const TABLE = {
   css3: SI("css"),
   scss: SI("sass"),
 
-  // frameworks & libraries
   node: SI("nodedotjs"),
   nodejs: SI("nodedotjs"),
   next: SI("nextdotjs"),
@@ -64,11 +51,9 @@ const TABLE = {
   godot: DEV("godot/godot-plain"),
   godotengine: DEV("godot/godot-plain"),
 
-  // data
   postgres: SI("postgresql"),
   mongo: SI("mongodb"),
 
-  // cloud & devops
   aws: DEV("amazonwebservices/amazonwebservices-original-wordmark"),
   amazonaws: DEV("amazonwebservices/amazonwebservices-original-wordmark"),
   amazonwebservices: DEV("amazonwebservices/amazonwebservices-original-wordmark"),
@@ -77,12 +62,10 @@ const TABLE = {
   gcp: SI("googlecloud"),
   k8s: SI("kubernetes"),
 
-  // ai / data science
   scikitlearn: SI("scikitlearn"),
   sklearn: SI("scikitlearn"),
   jupyternotebook: SI("jupyter"),
 
-  // web3 / misc aliases
   ethersjs: SI("ethers"),
   web3js: SI("web3dotjs"),
   socketio: SI("socketdotio"),
@@ -111,8 +94,6 @@ export const skillIcon = (skill, isDark) => {
       dev: `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/${hit.dev}.svg`,
     };
 
-  // Best-effort guess from the skill name itself ("Tailwind CSS" works,
-  // "Communication" 404s and is hidden by onError).
   if (stripped) return { si: siUrl(stripped, isDark) };
   return null;
 };

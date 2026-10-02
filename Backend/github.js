@@ -1,27 +1,66 @@
-// Shared GitHub fetch + stat computation.
-// Used by /analyze (profile scoring) so every request sees the same data.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 50;
 
-/**
- * Fetch a GitHub profile with its public repositories and precompute the
- * stats used across the app.
- * Throws an Error with `status` set (404) when the user does not exist.
- */
-export async function fetchGitHubData(username) {
-  const resp = await fetch(
-    `https://api.github.com/users/${encodeURIComponent(username)}`,
-  );
-  if (!resp.ok) {
+const cache = new Map();
+
+function cacheGet(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function cacheSet(key, value) {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, { at: Date.now(), value });
+}
+
+export function clearGitHubCache() {
+  cache.clear();
+}
+
+async function githubFetch(url) {
+  const resp = await fetch(url, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+  if (resp.ok) return resp;
+
+  const remaining = resp.headers.get("x-ratelimit-remaining");
+  if (resp.status === 403 && remaining === "0") {
+    const err = new Error(
+      "GitHub rate limit reached — please wait a few minutes and try again.",
+    );
+    err.status = 429;
+    throw err;
+  }
+  if (resp.status === 404) {
     const err = new Error("GitHub user not found");
     err.status = 404;
     throw err;
   }
-  const user = await resp.json();
+  const err = new Error(`GitHub request failed (${resp.status})`);
+  err.status = 502;
+  throw err;
+}
 
-  const reposRes = await fetch(user.repos_url);
-  if (!reposRes.ok) {
-    throw new Error("Failed to fetch repositories");
-  }
-  const repos = await reposRes.json();
+export async function fetchGitHubData(username) {
+  const key = username.toLowerCase();
+  const cached = cacheGet(key);
+  if (cached) return cached;
+
+  const user = await (
+    await githubFetch(
+      `https://api.github.com/users/${encodeURIComponent(username)}`,
+    )
+  ).json();
+
+  const repos = await (await githubFetch(user.repos_url)).json();
 
   let stars = 0,
     forks = 0,
@@ -43,8 +82,6 @@ export async function fetchGitHubData(username) {
     ((Date.now() - new Date(user.created_at)) / (365.25 * 86400000)).toFixed(1),
   );
 
-  // Top repositories with descriptions/topics — the raw material the LLM
-  // turns into resume project entries.
   const topReposFull = ranked.slice(0, 8).map((r) => ({
     name: r.name,
     stars: r.stargazers_count,
@@ -66,8 +103,6 @@ export async function fetchGitHubData(username) {
     forks,
     accountAgeYears,
     languages: Object.keys(langs).slice(0, 3),
-    // Full frequency map — lets the LLM build honest, evidence-based
-    // skill groups instead of guessing.
     languageCounts: Object.fromEntries(
       Object.entries(langs)
         .sort((a, b) => b[1] - a[1])
@@ -77,7 +112,7 @@ export async function fetchGitHubData(username) {
     topRepos: topReposFull,
   };
 
-  return {
+  const result = {
     user,
     repos,
     ranked,
@@ -89,4 +124,6 @@ export async function fetchGitHubData(username) {
     topReposFull,
     userData,
   };
+  cacheSet(key, result);
+  return result;
 }

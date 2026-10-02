@@ -1,4 +1,3 @@
-import React from "react";
 import { SkillIcon } from "../src/lib/skillIcons";
 
 const SignInButton = ({ onSignIn }) => (
@@ -29,16 +28,40 @@ const features = [
     desc: "Surfaces the technologies your work actually demonstrates — not what you claim.",
   },
   {
+    title: "Commit Activity Heatmap",
+    desc: "Every day of the current year as a contribution grid — current streak, longest streak, active days and your peak commit day.",
+  },
+  {
+    title: "Ready on Sign-In",
+    desc: "No analyze button. Your whole public profile is decoded the moment you sign in, then reused on every visit instead of re-running.",
+  },
+  {
+    title: "Role Match",
+    desc: "Pick a target role and get a fit score, what works in your favour, and what your GitHub proves that your resume is missing.",
+  },
+  {
+    title: "Growth Roadmap",
+    desc: "The specific things to learn and the projects to build next for that role — highest impact first, every step grounded in your work.",
+  },
+  {
+    title: "Never a Blank Page",
+    desc: "If GitHub throttles us, your last analysis is served with a clear 'this is cached' note instead of an error.",
+  },
+  {
+    title: "Repository Quality",
+    desc: "Deterministic checks on description, topics, license, freshness, demo link and tests — per repo and across your whole profile.",
+  },
+  {
     title: "Activity Insights",
     desc: "Consistency, community reach and focus of your recent contributions.",
   },
   {
     title: "Resume Cross-Check",
-    desc: "Attach a resume PDF and see exactly where it agrees or contradicts GitHub.",
+    desc: "Attach a resume PDF when you match a role and see exactly where it agrees or contradicts GitHub.",
   },
   {
     title: "Progress Tracking",
-    desc: "Every analysis is snapshotted — compare your score over time as you improve.",
+    desc: "Every analysis is snapshotted — a trend chart tracks your score, commit volume and repo quality over time.",
   },
   {
     title: "Top Repositories",
@@ -53,10 +76,6 @@ const features = [
     desc: "Concrete strengths, weaknesses and next steps — written like a hiring manager would.",
   },
   {
-    title: "Whole Profile, One Page",
-    desc: "Sign in and your entire public profile is decoded into one structured report — nothing to assemble.",
-  },
-  {
     title: "GitHub Sign-In",
     desc: "One click with GitHub OAuth — no passwords, no forms, no username to type.",
   },
@@ -64,25 +83,43 @@ const features = [
     title: "Live GitHub Data",
     desc: "Every analysis is pulled live from the GitHub API at run time — nothing stale or hand-entered.",
   },
+  {
+    title: "Measured, Not Guessed",
+    desc: "Commit counts and hygiene scores are computed in code and handed to the AI as fact — it cites them instead of inventing them.",
+  },
 ];
 
 const steps = [
   {
     title: "Sign in",
-    desc: "One click with GitHub — no passwords, no setup.",
+    desc: "One click with GitHub — no passwords, no username to type.",
   },
   {
-    title: "Hit analyze",
-    desc: "We use the GitHub account you signed in with — no typing needed.",
+    title: "Report's ready",
+    desc: "It analyses the account you signed in with automatically. There is no button to find.",
   },
   {
-    title: "Get the report",
-    desc: "Score, skills, activity insights and improvements in seconds.",
+    title: "Match a role",
+    desc: "Pick a target role, attach a resume if you want, and see the fit plus what to learn and build.",
   },
   {
     title: "Track progress",
-    desc: "Re-analyze anytime and compare against previous snapshots.",
+    desc: "Every run is snapshotted — watch your score, commits and repo quality move on a trend chart.",
   },
+];
+
+const measured = [
+  "Commit heatmap, streaks and peak day",
+  "Repository hygiene checks, per repo",
+  "Repos, stars, forks, languages",
+  "Top repositories by stars",
+];
+
+const written = [
+  "Profile summary and 0–100 score",
+  "Skill extraction and tech stack",
+  "Strengths, weaknesses, improvements",
+  "Role fit and the growth roadmap",
 ];
 
 const reportMock = {
@@ -116,13 +153,68 @@ const reportMock = {
   weaknesses: ["Readme quality uneven on your three most-starred repos"],
   improvements: ["Pin a flagship project and add setup docs + live demo"],
   trend: { prev: 72, now: 78 },
+  roleFit: {
+    role: "Frontend Developer",
+    score: 72,
+    summary: "Solid React work with clear product sense; testing depth is the gap.",
+    strengths: [
+      "React and TypeScript across multiple production-style repos",
+      "Consistent shipping cadence through the year",
+    ],
+    gaps: [
+      "Add a live demo link to your two highest-starred repos",
+      "State your test coverage on DevLens",
+    ],
+    roadmap: [
+      {
+        kind: "learn",
+        title: "React testing",
+        detail: "Jest and React Testing Library for component tests.",
+      },
+      {
+        kind: "build",
+        title: "Tested component library",
+        detail: "A reusable React library with real coverage.",
+      },
+      {
+        kind: "learn",
+        title: "Web accessibility",
+        detail: "ARIA attributes and WCAG guidelines.",
+      },
+    ],
+  },
+  heatWeeks: Array.from({ length: 13 }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const seed = (w * 7 + d * 3) % 5;
+      return seed === 0 ? 0 : ((w + d * 2) % 4) + 1;
+    }),
+  ),
+  heatTotal: 214,
+  heatStreak: 12,
+  quality: {
+    score: 68,
+    checks: [
+      { label: "Description", pct: 100 },
+      { label: "Topics", pct: 75 },
+      { label: "License", pct: 50 },
+      { label: "Recent push", pct: 88 },
+    ],
+  },
 };
+
+const HEAT_LEVELS = [
+  "bg-line",
+  "bg-ink/25",
+  "bg-ink/50",
+  "bg-ink/75",
+  "bg-ink",
+];
 
 const Landing = ({ onSignIn, theme }) => {
   const isDark = theme === "dark";
   return (
     <section className="w-full max-w-4xl flex flex-col items-center text-center anim-cascade pt-2 pb-10 sm:pb-16">
-      {/* Hero */}          <p className="text-muted text-xs sm:text-sm tracking-[0.25em] uppercase">
+      {}          <p className="text-muted text-xs sm:text-sm tracking-[0.25em] uppercase">
         AI-powered GitHub analysis
       </p>
 
@@ -135,8 +227,8 @@ const Landing = ({ onSignIn, theme }) => {
       <p className="text-muted mt-6 max-w-xl leading-relaxed">
         DevLens turns public GitHub data — and your resume, if you upload one —
         into a clear, structured report: what stands out, what is missing, and
-        exactly what to improve next. Then it remembers, so you can watch the
-        numbers move.
+        exactly what to improve next. Your report is ready the moment you sign
+        in, and it remembers, so you can watch the numbers move.
       </p>
 
       <SignInButton onSignIn={onSignIn} />
@@ -145,12 +237,12 @@ const Landing = ({ onSignIn, theme }) => {
         Free · No card required · Your data stays local
       </p>
 
-      {/* Mock report preview — mirrors the real analysis report */}
+      {}
       <p className="text-muted text-xs tracking-[0.25em] uppercase mt-20 sm:mt-28">
         sample report
       </p>
       <div className="w-full max-w-2xl border border-edge bg-surface mt-4 text-left anim-fade-up">
-        {/* Profile header + score */}
+        {}
         <div className="flex items-center gap-4 border-b border-line p-5">
           <span className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border border-edge
             flex items-center justify-center font-bold text-lg shrink-0">
@@ -173,7 +265,7 @@ const Landing = ({ onSignIn, theme }) => {
           </div>
         </div>
 
-        {/* Stats strip */}
+        {}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-line border-b border-line">
           {reportMock.stats.map((s) => (
             <div key={s.label} className="bg-surface p-2 text-center">
@@ -183,7 +275,58 @@ const Landing = ({ onSignIn, theme }) => {
           ))}
         </div>
 
-        {/* Tech stack + activity */}
+        {}
+        <div className="border-b border-line p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <p className="text-xs font-medium">Commit Activity</p>
+            <p className="text-muted text-[11px] tabular-nums">
+              {reportMock.heatTotal} commits · {reportMock.heatStreak}-day streak
+            </p>
+          </div>
+          <div className="flex gap-[2px]">
+            {reportMock.heatWeeks.map((week, w) => (
+              <div key={w} className="flex flex-col gap-[2px]">
+                {week.map((n, d) => (
+                  <span
+                    key={d}
+                    className={`w-2.5 h-2.5 ${HEAT_LEVELS[n]}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="text-muted text-[11px] mt-2">
+            Public commits you authored, January to December
+          </p>
+        </div>
+
+        {}
+        <div className="border-b border-line p-4">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <p className="text-xs font-medium">Repository Quality</p>
+            <p className="text-xs font-bold tabular-nums">
+              {reportMock.quality.score}
+              <span className="text-muted font-normal">/100</span>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {reportMock.quality.checks.map((c) => (
+              <div key={c.label}>
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-muted text-[10px] uppercase tracking-wider">
+                    {c.label}
+                  </span>
+                  <span className="text-[10px] tabular-nums">{c.pct}%</span>
+                </div>
+                <div className="h-1 bg-line mt-1 overflow-hidden">
+                  <div className="h-full bg-ink" style={{ width: `${c.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line border-b border-line">
           <div className="bg-surface p-4">
             <p className="text-xs font-medium mb-2">Tech Stack</p>
@@ -213,7 +356,7 @@ const Landing = ({ onSignIn, theme }) => {
           </div>
         </div>
 
-        {/* Strengths / weaknesses / improvements */}
+        {}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line border-b border-line">
           {[
             ["Strengths", reportMock.strengths],
@@ -234,7 +377,76 @@ const Landing = ({ onSignIn, theme }) => {
           ))}
         </div>
 
-        {/* Progress trend */}
+        {}
+        <div className="border-b border-line p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">
+                Role Fit — {reportMock.roleFit.role}
+              </p>
+              <p className="text-muted text-[11px] mt-0.5 leading-snug">
+                {reportMock.roleFit.summary}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="text-xl font-bold tabular-nums">
+                {reportMock.roleFit.score}
+                <span className="text-muted text-[11px] font-normal">/100</span>
+              </span>
+              <div className="h-1.5 w-24 bg-line overflow-hidden">
+                <div
+                  className="h-full bg-ink"
+                  style={{ width: `${reportMock.roleFit.score}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="border border-line p-2">
+              <p className="text-[11px] font-medium mb-1">In your favour</p>
+              <ul className="text-muted text-[11px] leading-snug space-y-1">
+                {reportMock.roleFit.strengths.map((t) => (
+                  <li key={t} className="flex gap-1.5">
+                    <span aria-hidden="true">&middot;</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="border border-line p-2">
+              <p className="text-[11px] font-medium mb-1">Missing from resume</p>
+              <ul className="text-muted text-[11px] leading-snug space-y-1">
+                {reportMock.roleFit.gaps.map((t) => (
+                  <li key={t} className="flex gap-1.5">
+                    <span aria-hidden="true">&middot;</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="text-[11px] font-medium mt-3 mb-1.5">
+            What to learn &amp; build next
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {reportMock.roleFit.roadmap.map((r) => (
+              <div key={r.title} className="border border-line p-2">
+                <span className="text-[8px] uppercase tracking-widest text-muted
+                  border border-line px-1 py-0.5">
+                  {r.kind === "build" ? "Build" : "Learn"}
+                </span>
+                <p className="text-[11px] font-medium mt-1.5">{r.title}</p>
+                <p className="text-muted text-[11px] mt-0.5 leading-snug">
+                  {r.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {}
         <div className="flex items-center justify-between px-4 py-3 text-xs">
           <span className="text-muted">Your progress</span>
           <span className="font-medium tabular-nums">
@@ -246,12 +458,12 @@ const Landing = ({ onSignIn, theme }) => {
         </div>
       </div>
 
-      {/* Features */}
+      {}
       <h3 id="features" className="text-2xl sm:text-3xl font-bold mt-24 sm:mt-32 scroll-mt-24">
         Everything the report covers
       </h3>
       <p className="text-muted mt-3 max-w-lg">
-        One analysis. Eight signals. No dashboard clutter.
+        One analysis. Eighteen signals. No dashboard clutter.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-line border border-line mt-10 w-full">
@@ -268,7 +480,39 @@ const Landing = ({ onSignIn, theme }) => {
         ))}
       </div>
 
-      {/* How it works */}
+      {}
+      <h3 id="measured" className="text-2xl sm:text-3xl font-bold mt-24 sm:mt-32 scroll-mt-24">
+        Measured, not guessed
+      </h3>
+      <p className="text-muted mt-3 max-w-lg">
+        Half of this report is computed in code from the GitHub API. The other
+        half is written by a model that is given those numbers as fact — which
+        is why it never contradicts the charts above it.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-line border border-line mt-10 w-full text-left">
+        {[
+          ["Measured by DevLens", "Deterministic — the same input always gives the same number.", measured],
+          ["Written by the model", "Interpretation — grounded in the measured signals, never invented.", written],
+        ].map(([title, sub, items]) => (
+          <div key={title} className="bg-surface p-5 flex flex-col gap-3">
+            <div>
+              <h4 className="font-medium text-sm">{title}</h4>
+              <p className="text-muted text-xs mt-1 leading-relaxed">{sub}</p>
+            </div>
+            <ul className="text-xs space-y-1.5">
+              {items.map((item) => (
+                <li key={item} className="flex gap-2 text-muted">
+                  <span aria-hidden="true">✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {}
       <h3 id="how-it-works" className="text-2xl sm:text-3xl font-bold mt-24 sm:mt-32 scroll-mt-24">
         How it works
       </h3>
@@ -286,7 +530,7 @@ const Landing = ({ onSignIn, theme }) => {
         ))}
       </div>
 
-      {/* Final CTA */}
+      {}
       <h3 className="text-2xl sm:text-3xl font-bold mt-24 sm:mt-32 max-w-xl">
         Your profile is already public.
         <br />
@@ -296,7 +540,7 @@ const Landing = ({ onSignIn, theme }) => {
       <SignInButton onSignIn={onSignIn} />
 
       <p className="text-muted text-xs mt-3 mb-6">
-        Takes ~30 seconds · Re-analyze anytime
+        Takes ~30 seconds · Match any role, any time
       </p>
     </section>
   );

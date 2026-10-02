@@ -6,7 +6,7 @@ const Footer = () => {
     <footer className="w-full border-t border-edge bg-canvas mt-8">
       <div className="px-6 py-8">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
-        {/* Brand column */}
+        {}
         <div className="flex flex-col gap-3">
           <span className="font-bold text-lg">DevLens</span>
           <p className="text-muted leading-relaxed">
@@ -15,7 +15,7 @@ const Footer = () => {
           </p>
         </div>
 
-        {/* Product links column */}
+        {}
         <div className="flex flex-col gap-2">
           <h4 className="font-medium mb-1">Product</h4>
           <a href="#features" className="text-muted hover:text-ink transition-colors w-fit">
@@ -29,7 +29,7 @@ const Footer = () => {
           </a>
         </div>
 
-        {/* Contact column */}
+        {}
         <div className="flex flex-col gap-2">
           <h4 className="font-medium mb-1">Contact</h4>
           <a

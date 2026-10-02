@@ -24,7 +24,7 @@ export const ThemeToggle = ({ isDark, onToggleTheme, className = "" }) => (
   </button>
 );
 
-const Header = ({ user, theme, onToggleTheme, onSignOut }) => {
+const Header = ({ theme, onToggleTheme, onSignOut }) => {
   const isDark = theme === "dark";
   return (
     <header className="sticky top-0 z-20 w-full px-3 sm:px-6 pt-3 anim-fade-in">
@@ -32,7 +32,7 @@ const Header = ({ user, theme, onToggleTheme, onSignOut }) => {
         border border-edge bg-surface/40 backdrop-blur-md px-3 sm:px-4 py-2
         shadow-lg shadow-black/10 dark:shadow-black/50">
 
-        {/* Brand: lens glyph + wordmark */}
+        {}
         <a href="#" className="group flex items-center gap-2.5 shrink-0">
           <span className="flex h-7 w-7 items-center justify-center border
             border-edge transition-colors group-hover:bg-ink group-hover:text-on-ink">
@@ -53,42 +53,24 @@ const Header = ({ user, theme, onToggleTheme, onSignOut }) => {
           </span>
         </a>
 
-        {/* Right: account chip + theme toggle */}
+        {}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 anim-pop-in">
-            <img
-              src={user.avatar}
-              alt={user.login}
-              className="h-6 w-6 rounded-full border border-edge shrink-0"
-            />
-            <a
-              href={user.profile}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:block text-sm font-medium hover:underline
-                max-w-[120px] truncate"
-              title={user.login}
-            >
-              {user.login}
-            </a>
-            <span aria-hidden="true" className="hidden sm:block h-4 w-px bg-line" />
-            <button
-              type="button"
-              onClick={onSignOut}
-              aria-label="Sign out"
-              title="Sign out"
-              className="border border-edge p-1.5 cursor-pointer transition-colors
-                hover:bg-ink hover:text-on-ink"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onSignOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="border border-edge p-1.5 cursor-pointer transition-colors
+              hover:bg-ink hover:text-on-ink anim-pop-in"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+              strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
 
           <ThemeToggle isDark={isDark} onToggleTheme={onToggleTheme} />
         </div>

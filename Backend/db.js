@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-/** Connect to MongoDB Atlas. Call once at startup, before listening. */
 export async function connectDB() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {

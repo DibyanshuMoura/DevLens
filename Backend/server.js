@@ -1,5 +1,3 @@
-// Must be first: ESM evaluates imports before module bodies, so env vars
-// have to load during import — not later via dotenv.config().
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -9,8 +7,16 @@ import jwt from "jsonwebtoken";
 import { PDFParse } from "pdf-parse";
 import authRouter from "./auth.js";
 import { appendSnapshot } from "./history.js";
+import {
+  saveAnalysis,
+  getLatestAnalysis,
+  isStale,
+  toResponse,
+} from "./analyses.js";
 import { connectDB } from "./db.js";
 import { fetchGitHubData } from "./github.js";
+import { fetchCommitActivity, activityDigest } from "./activity.js";
+import { assessRepoQuality, qualityDigest } from "./quality.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -21,11 +27,10 @@ app.use(cors());
 
 app.use("/auth", authRouter);
 
-// Keep uploads in memory only — nothing is written to disk.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === "application/pdf") {
@@ -37,10 +42,10 @@ const upload = multer({
 });
 
 const MAX_RESUME_CHARS = 6000;
+const ANALYSIS_MAX_AGE_MS = 60 * 60 * 1000;
 
 const DEFAULT_GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
-/** Parse LLM output even when it arrives fenced or wrapped in prose. */
 function parseJsonLoose(text) {
   let t = String(text).trim();
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -48,7 +53,6 @@ function parseJsonLoose(text) {
   try {
     return JSON.parse(t);
   } catch {
-    // Last resort: slice out the outermost {...} / [...] block.
     const start = t.search(/[{[]/);
     const end = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
     if (start !== -1 && end > start) {
@@ -58,14 +62,6 @@ function parseJsonLoose(text) {
   }
 }
 
-/**
- * Ask Groq for a JSON answer and return the parsed object.
- *
- * gpt-oss models occasionally fail json_object validation ("Failed to
- * validate JSON"), so: attempt 1 is strict JSON mode; attempt 2 retries the
- * same model without response_format; attempt 3 falls back to the smaller
- * model that reliably honors json mode.
- */
 async function callGroqJson(prompt, { temperature = 0.4 } = {}) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error("Groq API key is missing");
@@ -126,8 +122,6 @@ async function extractResumeText(file) {
   const parser = new PDFParse({ data: file.buffer });
   try {
     const result = await parser.getText();
-    // Collapse whitespace and drop pdf-parse's "-- 1 of 3 --" page markers
-    // so the LLM prompt stays compact and readable.
     return result.text
       .replace(/--\s*\d+\s*of\s*\d+\s*--/g, "")
       .replace(/\s+/g, " ")
@@ -138,7 +132,25 @@ async function extractResumeText(file) {
   }
 }
 
-function buildPrompt(userData, resumeText, jobRole) {
+function buildPrompt(userData, { resumeText, jobRole, activity, quality }) {
+  const signals = {};
+  const activityFacts = activityDigest(activity);
+  const qualityFacts = qualityDigest(quality);
+  if (activityFacts) signals.commitActivity = activityFacts;
+  if (qualityFacts) signals.repoQuality = qualityFacts;
+
+  const signalSection = Object.keys(signals).length
+    ? `
+  Verified Signals (computed by DevLens — treat as ground truth, do not
+  re-estimate or contradict):
+  ${JSON.stringify(signals)}
+
+  Use these numbers verbatim in "activity" and "improvements" when relevant.
+  Only describe public push activity as "public commits" — the data covers
+  public pushes, not private work or full history.
+  `
+    : "";
+
   const resumeSection = resumeText
     ? `
   Candidate Resume (text extracted from uploaded PDF):
@@ -201,7 +213,7 @@ function buildPrompt(userData, resumeText, jobRole) {
   GitHub Data:
   ${JSON.stringify(userData)}
   ${resumeSection}
-${roleSection}
+${roleSection}${signalSection}
   STRICT RULES:
   - Return ONLY valid JSON
   - Do not include markdown
@@ -216,6 +228,8 @@ ${roleSection}
   - "score": integer 0-100 rating overall profile strength
   - "skills": array of up to 6 concrete technologies evident from the data
   - "activity": exactly 3 objects, each {"title": short label, "detail": one sentence}
+    - Prefer verified commit/streak signals over vague statements like
+      "the developer is active" whenever the Verified Signals block is present
   - "strengths", "weaknesses", "improvements": each exactly 3 short bullet points
   - "resumeMatch": 3 short bullet points when a resume is provided, otherwise []
   - "quote": ONE line (max ~90 characters) that captures this developer's
@@ -282,103 +296,323 @@ const JOB_ROLES = [
   "Technical Writer",
 ];
 
-// Job role list for the frontend dropdown.
 app.get("/roles", (_req, res) => {
   res.json({ roles: JOB_ROLES });
 });
 
-async function analyzeProfile(req, res, username, resumeText, jobRole) {
+app.get("/activity", requireSignedIn, async (req, res) => {
   try {
-    const gh = await fetchGitHubData(username);
-    const user = gh.user;
-    const ranked = gh.ranked;
-    const stars = gh.stars;
-    const forks = gh.forks;
-    const active = gh.active;
-    const accountAgeYears = gh.accountAgeYears;
-    const userData = gh.userData;
+    const gh = await fetchGitHubData(req.user.login);
+    const activity = await fetchCommitActivity(req.user.login, gh.repos);
+    res.json({ activity });
+  } catch (error) {
+    console.error("Activity error:", error.message);
+    res.status(error.status || 500).json({
+      message: error.message || "Could not load commit activity",
+    });
+  }
+});
 
-    const prompt = buildPrompt(userData, resumeText, jobRole);
-    const parsed = await callGroqJson(prompt);
+const QUOTE_FALLBACKS = [
+  "Talk is cheap. Show me the code. — Linus Torvalds",
+  "Simplicity is the soul of efficiency. — Austin Freeman",
+  "First, solve the problem. Then, write the code. — John Johnson",
+  "Make it work, make it right, make it fast. — Kent Beck",
+  "Programming isn't about what you know; it's about what you can figure out. — Chris Pine",
+  "The best way to predict the future is to invent it. — Alan Kay",
+];
 
-    // The quote is cosmetic (profile-card only) — if the model skipped it,
-    // fall back to a deterministic pick so the card always has one.
-    if (!parsed.quote || typeof parsed.quote !== "string") {
-      const QUOTE_FALLBACKS = [
-        "Talk is cheap. Show me the code. — Linus Torvalds",
-        "Simplicity is the soul of efficiency. — Austin Freeman",
-        "First, solve the problem. Then, write the code. — John Johnson",
-        "Make it work, make it right, make it fast. — Kent Beck",
-        "Programming isn't about what you know; it's about what you can figure out. — Chris Pine",
-        "The best way to predict the future is to invent it. — Alan Kay",
-      ];
-      parsed.quote =
-        QUOTE_FALLBACKS[userData.username.length % QUOTE_FALLBACKS.length];
-    }
-    // Snapshot for the signed-in user's history/comparison view.
-    // The JWT is verified defensively — analysis still succeeds for
-    // anonymous users even if the session is expired or absent.
-    let signedInUser = null;
-    try {
-      const header = req.headers.authorization || "";
-      const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-      if (token && process.env.JWT_SECRET) {
-        signedInUser = jwt.verify(token, process.env.JWT_SECRET);
-      }
-    } catch {
-      signedInUser = null;
-    }
+async function buildAnalysis(username, resumeText = "", jobRole = null) {
+  const gh = await fetchGitHubData(username);
+  const user = gh.user;
+  const ranked = gh.ranked;
+  const stars = gh.stars;
+  const forks = gh.forks;
+  const active = gh.active;
+  const accountAgeYears = gh.accountAgeYears;
+  const userData = gh.userData;
+
+  const activity = await fetchCommitActivity(username, gh.repos);
+  const quality = assessRepoQuality(gh.repos);
+  const prompt = buildPrompt(userData, { resumeText, jobRole, activity, quality });
+  const parsed = await callGroqJson(prompt);
+
+  if (!parsed.quote || typeof parsed.quote !== "string") {
+    parsed.quote =
+      QUOTE_FALLBACKS[userData.username.length % QUOTE_FALLBACKS.length];
+  }
+
+  return {
+    dp: user.avatar_url,
+    name: user.login,
+    id: user.html_url,
+    res: parsed,
+    hasResume: Boolean(resumeText),
+    role: jobRole || null,
+    activity,
+    quality: quality || null,
+    stats: {
+      repos: user.public_repos,
+      followers: user.followers,
+      stars,
+      forks,
+      activeRepos: active,
+      accountAgeYears,
+      languages: userData.languages,
+      topRepos: ranked.slice(0, 5).map((r) => ({
+        name: r.name,
+        stars: r.stargazers_count,
+        language: r.language,
+        url: r.html_url,
+      })),
+    },
+  };
+}
+
+async function recordSnapshot(user, payload, activity, quality) {
+  try {
+    await appendSnapshot(user, {
+      username: payload.name,
+      score: payload.res?.score,
+      repos: payload.stats?.repos,
+      followers: payload.stats?.followers,
+      stars: payload.stats?.stars,
+      forks: payload.stats?.forks,
+      activeRepos: payload.stats?.activeRepos,
+      skills: payload.res?.skills || [],
+      commits30: activity?.commits30 ?? null,
+      longestStreak: activity?.longestStreak ?? null,
+      hygieneScore: quality?.score ?? null,
+    });
+  } catch (err) {
+    console.error("Snapshot failed:", err.message);
+  }
+}
+
+function readSession(req) {
+  try {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (token && process.env.JWT_SECRET) return jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+  }
+  return null;
+}
+
+async function analyzeProfile(req, res, username, resumeText, jobRole) {
+  const signedInUser = readSession(req);
+  try {
+    const payload = await buildAnalysis(username, resumeText, jobRole);
 
     if (signedInUser) {
+      await recordSnapshot(
+        signedInUser,
+        payload,
+        payload.activity,
+        payload.quality,
+      );
       try {
-        await appendSnapshot(signedInUser, {
-          username: userData.username,
-          score: parsed.score,
-          repos: userData.repos,
-          followers: user.followers,
-          stars,
-          forks,
-          activeRepos: active,
-          skills: parsed.skills || [],
-        });
+        await saveAnalysis(signedInUser, payload);
       } catch (err) {
-        console.error("Snapshot failed:", err.message);
+        console.error("Save analysis failed:", err.message);
       }
     }
 
     res.status(200).json({
-      dp: user.avatar_url,
-      name: user.login,
-      id: user.html_url,
-      res: parsed,
-      hasResume: Boolean(resumeText),
-      role: jobRole || null,
-      stats: {
-        repos: user.public_repos,
-        followers: user.followers,
-        stars,
-        forks,
-        activeRepos: active,
-        accountAgeYears,
-        languages: userData.languages,
-        topRepos: ranked.slice(0, 5).map((r) => ({
-          name: r.name,
-          stars: r.stargazers_count,
-          language: r.language,
-          url: r.html_url,
-        })),
-      },
+      ...payload,
+      cached: false,
+      analyzedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+
+    if ((error.status === 429 || error.status === 403) && signedInUser) {
+      try {
+        const doc = await getLatestAnalysis(signedInUser);
+        if (doc) {
+          return res.status(200).json({
+            ...toResponse(doc, { cached: true }),
+            notice:
+              "GitHub's rate limit was reached, so this is your last saved analysis.",
+          });
+        }
+      } catch (err) {
+        console.error("Cached analysis fallback failed:", err.message);
+      }
+    }
+
+    res.status(error.status || 500).json({
       message: error.message || "Internal server error",
     });
   }
 }
 
-// When OAuth is configured the analyzer is members-only. Without OAuth
-// credentials the endpoint stays open (self-host / demo friendly).
+function buildRoleFitPrompt(base, jobRole, resumeText) {
+  const signals = {};
+  const activityFacts = activityDigest(base.activity);
+  const qualityFacts = qualityDigest(base.quality);
+  if (activityFacts) signals.commitActivity = activityFacts;
+  if (qualityFacts) signals.repoQuality = qualityFacts;
+
+  const profile = {
+    username: base.name,
+    summary: base.res?.summary,
+    score: base.res?.score,
+    skills: base.res?.skills,
+    strengths: base.res?.strengths,
+    weaknesses: base.res?.weaknesses,
+    improvements: base.res?.improvements,
+    languages: base.stats?.languages,
+    stats: base.stats,
+    topRepos: base.stats?.topRepos,
+    resumeMatch: base.res?.resumeMatch,
+  };
+
+  return `
+  You are a senior engineering recruiter.
+
+  A candidate has already had their GitHub profile analyzed. Your ONLY job is
+  to judge that existing analysis against one specific target role.
+
+  Target Job Role: ${jobRole}
+
+  Existing Analysis:
+  ${JSON.stringify(profile)}
+
+  Verified Signals (computed by DevLens — treat as ground truth):
+  ${JSON.stringify(signals)}
+
+  ${resumeText ? `Candidate Resume (text extracted from an uploaded PDF):
+  """
+  ${resumeText}
+  """
+
+  Use the resume for context about stated skills, projects and experience.
+  ` : "No resume was uploaded for this match."}
+
+  STRICT RULES:
+  - Return ONLY valid JSON, no markdown, no explanation, no backticks
+  - Keep every point factual, based ONLY on the data above
+  - Do not invent technologies, employers or achievements
+
+  Field rules:
+  - "score": integer 0-100, how ready this candidate is for the role
+  - "summary": one sentence on overall fit for the role
+  - "strengths": exactly 3 short points where the profile supports the role
+  - "gaps": exactly 3 short points describing concrete things visible in the
+    GitHub profile or resume that are MISSING from the candidate's resume
+    (an unstated project, an unlisted skill, a repo-worthy achievement), each
+    phrased as a resume-ready addition. With no resume uploaded, phrase gaps
+    as what a resume for this role should mention.
+  - "roadmap": exactly 6 items, ordered highest-impact first, each
+    {"kind": "learn" | "build", "title": short label, "detail": one sentence,
+    "skills": [up to 3 short skill or technology names]}
+    Use "learn" for knowledge or tooling the candidate should pick up, and
+    "build" for a concrete project they should create to prove it.
+    Every project must be something a portfolio for this role would genuinely
+    value, and must build on what the profile already suggests — never invent
+    a technology the candidate has no connection to.
+
+  Expected JSON format:
+  {
+    "score": 80,
+    "summary": "sentence",
+    "strengths": ["point", "point", "point"],
+    "gaps": ["point", "point", "point"],
+    "roadmap": [
+      {
+        "kind": "learn",
+        "title": "short label",
+        "detail": "one sentence",
+        "skills": ["name", "name"]
+      },
+      {
+        "kind": "build",
+        "title": "short label",
+        "detail": "one sentence",
+        "skills": ["name", "name"]
+      }
+    ]
+  }
+  `;
+}
+
+app.get("/analysis", requireSignedIn, async (req, res) => {
+  if (!req.user) return res.json({ analysis: null, needsAnalysis: true });
+  try {
+    const doc = await getLatestAnalysis(req.user);
+    if (!doc) {
+      return res.json({ analysis: null, needsAnalysis: true });
+    }
+    const stale = isStale(doc, ANALYSIS_MAX_AGE_MS);
+    res.json({
+      analysis: toResponse(doc, { cached: true, stale }),
+      needsAnalysis: stale,
+    });
+  } catch (err) {
+    console.error("Load analysis error:", err.message);
+    res.status(500).json({ message: "Failed to load your analysis" });
+  }
+});
+
+app.post(
+  "/match",
+  requireSignedIn,
+  upload.single("resume"),
+  async (req, res) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ message: "Sign in with GitHub to match roles" });
+    }
+    const role = JOB_ROLES.find(
+      (r) =>
+        r.toLowerCase() === String(req.body?.role || "").trim().toLowerCase(),
+    );
+    if (!role) {
+      return res.status(400).json({ message: "Pick a target job role first" });
+    }
+
+    let base;
+    try {
+      base = toResponse(await getLatestAnalysis(req.user));
+    } catch (err) {
+      console.error("Load analysis for match failed:", err.message);
+      return res.status(500).json({ message: "Failed to load your analysis" });
+    }
+    if (!base) {
+      return res.status(409).json({
+        message: "No analysis yet — wait for it to finish, then match a role.",
+      });
+    }
+
+    let resumeText = "";
+    if (req.file) {
+      try {
+        resumeText = await extractResumeText(req.file);
+      } catch (error) {
+        console.error("Resume extraction failed:", error.message);
+        return res.status(400).json({
+          message: "Could not read the PDF. Is it a valid resume file?",
+        });
+      }
+    }
+
+    try {
+      const roleFit = await callGroqJson(
+        buildRoleFitPrompt(base, role, resumeText),
+        { temperature: 0.3 },
+      );
+      res.json({ role, roleFit, hasResume: Boolean(resumeText) });
+    } catch (error) {
+      console.error("Role match failed:", error.message);
+      res.status(500).json({
+        message: error.message || "Could not complete the match",
+      });
+    }
+  },
+);
+
 function requireSignedIn(req, res, next) {
   const authReady = Boolean(
     process.env.GITHUB_CLIENT_ID &&
@@ -416,8 +650,6 @@ app.get("/analyze", requireSignedIn, (req, res) => {
 });
 
 app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) => {
-  // Signed-in users don't type a username — default to their own login
-  // from the verified JWT.
   const username = (req.body?.username || req.user?.login || "").trim();
   if (!username) {
     return res.status(400).json({ message: "Username is required" });
@@ -441,7 +673,6 @@ app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) 
   analyzeProfile(req, res, username.trim(), resumeText, role || null);
 });
 
-// Multer errors (file too large, wrong type, etc.) land here as JSON.
 app.use((err, _req, res, _next) => {
   res.status(400).json({
     message: err.message || "Upload failed",

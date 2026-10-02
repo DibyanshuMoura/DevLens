@@ -4,7 +4,6 @@ import Middle from "../components/Middle";
 import Footer from "../components/Footer";
 import Landing from "../components/Landing";
 import {
-  getToken,
   clearToken,
   fetchMe,
   consumeTokenFromUrl,
@@ -49,7 +48,7 @@ const App = () => {
   };
 
   return (
-    <div className="w-full min-h-full bg-canvas flex flex-col">
+    <div className="w-full min-h-screen bg-canvas flex flex-col">
       {authError && (
         <p className="bg-ink text-on-ink text-sm text-center py-2 px-4 anim-fade-in">
           {authError}
@@ -59,7 +58,6 @@ const App = () => {
       {user ? (
         <>
           <Header
-            user={user}
             theme={theme}
             onToggleTheme={handleToggleTheme}
             onSignOut={handleSignOut}
@@ -68,7 +66,7 @@ const App = () => {
         </>
       ) : (
         <>
-          {/* No navbar on the landing page — standalone theme toggle instead */}
+          {}
           <ThemeToggle
             isDark={theme === "dark"}
             onToggleTheme={handleToggleTheme}

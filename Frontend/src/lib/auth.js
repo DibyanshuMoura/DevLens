@@ -12,7 +12,6 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-/** Validate a stored token against the backend; returns the user or null. */
 export async function fetchMe() {
   const token = getToken();
   if (!token) return null;
@@ -33,7 +32,6 @@ export function authErrorMessage() {
   const params = new URLSearchParams(window.location.search);
   const err = params.get("authError");
   if (!err) return null;
-  // Strip consumed params so a refresh doesn't resurface the error.
   params.delete("authError");
   params.delete("token");
   const qs = params.toString();
@@ -45,7 +43,6 @@ export function authErrorMessage() {
   return err;
 }
 
-/** Consume ?token=... after OAuth redirect. Returns user payload or null. */
 export function consumeTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
