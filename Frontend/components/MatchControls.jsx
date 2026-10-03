@@ -66,7 +66,7 @@ const MatchControls = ({
         {resume ? (
           <div className="anim-pop-in flex items-center gap-2 border border-edge px-3 py-2 text-sm max-w-full min-w-0">
             <span
-              className="truncate max-w-[180px] sm:max-w-[260px]"
+              className="truncate max-w-[11.25rem] sm:max-w-[16.25rem]"
               title={resume.name}
             >
               {resume.name}
@@ -106,7 +106,7 @@ const MatchControls = ({
           aria-label="Target job role"
           className="w-full sm:w-auto border border-edge bg-surface px-3 py-2.5 text-sm cursor-pointer
             hover:border-ink focus:outline-none focus:border-ink disabled:opacity-60
-            disabled:cursor-not-allowed sm:max-w-[260px] truncate"
+            disabled:cursor-not-allowed sm:max-w-[16.25rem] truncate"
         >
           <option value="">Target job role…</option>
           {roles.map((r) => (

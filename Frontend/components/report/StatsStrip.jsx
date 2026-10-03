@@ -17,7 +17,7 @@ const StatsStrip = ({ stats }) => {
       {items.map((s) => (
         <div key={s.label} className="bg-surface p-3 text-center">
           <p className="font-bold text-xl tabular-nums">{s.value}</p>
-          <p className="text-[10px] text-muted uppercase tracking-wider">
+          <p className="text-[0.625rem] text-muted uppercase tracking-wider">
             {s.label}
           </p>
         </div>

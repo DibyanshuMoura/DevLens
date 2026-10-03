@@ -12,7 +12,11 @@ import { useHistory } from "../src/hooks/useHistory";
 import { useCommitActivity } from "../src/hooks/useCommitActivity";
 
 const PDF = "application/pdf";
-const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+/* Deliberately under the server's 5 MB multer limit. Rejecting a too-large file
+   here means we never start a multipart body that the server would abort
+   mid-stream — on a slow mobile connection that abort reads as a bare
+   "Failed to fetch" instead of a readable error. */
+const MAX_RESUME_BYTES = 4.5 * 1024 * 1024;
 
 const PROMO = [
   [
@@ -72,7 +76,7 @@ const Middle = ({ user, theme }) => {
     }
     if (file.type !== PDF) return rejectFile("Please select a PDF file.", e.target);
     if (file.size > MAX_RESUME_BYTES)
-      return rejectFile("Resume must be 5 MB or smaller.", e.target);
+      return rejectFile("Resume must be under 4.5 MB.", e.target);
     setFileError("");
     setResume(file);
   }

@@ -93,7 +93,7 @@ const ScoreTrend = ({ snapshots = [] }) => {
             <span key={s.key} className="flex items-center gap-1.5 text-xs text-muted">
               <span
                 aria-hidden="true"
-                className={`w-3 h-[2px] ${
+                className={`w-3 h-[0.125rem] ${
                   s.key === "score"
                     ? "bg-ink"
                     : s.key === "commits30"

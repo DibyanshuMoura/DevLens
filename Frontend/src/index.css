@@ -14,7 +14,13 @@
   --c-line-2: #e5e7eb;
   --c-line-strong: #9ca3af;
   --c-edge: #000000;
+  /* Tiled "+" backdrop. Swap these per theme to recolour the pattern. */
+  --c-pattern-plus: #000000;
+  --pattern-opacity: 0.07;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Shape only — the glyph colour comes from --c-pattern-plus via background-color. */
+  --pattern-tile: 1.25rem;
+  --mask-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M14 8.5v11M8.5 14h11' stroke='%23000' stroke-width='1.75'/%3E%3C/svg%3E");
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   --dur-fast: 140ms;
   --dur-base: 260ms;
@@ -24,6 +30,47 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+
+  /* Mobile baseline: everything below is Tailwind's rem scale, so the whole UI
+     is proportional to this one value. Keep 16px on phones — bump it up as the
+     viewport grows so desktop no longer needs zooming to read. */
+  font-size: 16px;
+}
+
+@media (min-width: 640px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 19.5px;
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 21px;
+  }
+}
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 22.5px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 24px;
+  }
 }
 
 html.dark {
@@ -38,6 +85,8 @@ html.dark {
   --c-line-2: #2a2a2a;
   --c-line-strong: #525252;
   --c-edge: #444444;
+  --c-pattern-plus: #ffffff;
+  --pattern-opacity: 0.1;
 }
 
 @theme inline {
@@ -209,8 +258,8 @@ body {
 
 .loading-bar {
   position: relative;
-  height: 2px;
-  width: 160px;
+  height: 0.125rem;
+  width: 10rem;
   margin: 0 auto;
   overflow: hidden;
   background: var(--c-line);
@@ -356,6 +405,43 @@ button:not(:disabled):active {
   transform: scale(0.97);
 }
 
+/* ---------------------------------------------------------------------------
+   Tiled "+" backdrop shared by the landing page and the report page.
+   The `plusminus` class goes on the page wrapper so the field spans the header
+   too, and <PlusPattern /> is its first child. The footer keeps its own opaque
+   bg-canvas, so it masks the pattern back out.
+   Theme via --c-pattern-plus / --pattern-opacity.
+   --------------------------------------------------------------------------- */
+
+/* `isolation` makes this a stacking context, so the host can sit behind every
+   in-flow child (most of the report's panels are unpositioned) without each one
+   needing its own z-index. */
+.plusminus {
+  position: relative;
+  isolation: isolate;
+}
+
+.plusminus-host {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.plusminus-plus {
+  position: absolute;
+  inset: 0;
+  background-color: var(--c-pattern-plus);
+  opacity: var(--pattern-opacity);
+  -webkit-mask-image: var(--mask-plus);
+  mask-image: var(--mask-plus);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: var(--pattern-tile) var(--pattern-tile);
+  mask-size: var(--pattern-tile) var(--pattern-tile);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -364,5 +450,6 @@ button:not(:disabled):active {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
   }
 }

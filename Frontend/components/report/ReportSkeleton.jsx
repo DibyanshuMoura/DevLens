@@ -24,11 +24,11 @@ const HeatmapSkeleton = () => (
       ))}
     </div>
     <div className="mt-5 overflow-x-auto pb-1 scroll-x-smooth">
-      <div className="w-full min-w-[620px]">
-        <div className="flex flex-col gap-[2px]">
+      <div className="w-full min-w-[38.75rem]">
+        <div className="flex flex-col gap-[0.125rem]">
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
             <div key={d} className="flex items-center">
-              <span className="w-7 shrink-0 text-[9px] text-muted pr-1 text-right">
+              <span className="w-7 shrink-0 text-[0.5625rem] text-muted pr-1 text-right">
                 {d}
               </span>
               {Array.from({ length: 53 }, (_, w) => (
@@ -61,9 +61,9 @@ export const ControlsSkeleton = () => (
       </div>
     </div>
     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mt-4">
-      <span className="h-[42px] w-full sm:w-36 border border-dashed border-line skeleton" />
-      <span className="h-[42px] w-full sm:w-[260px] skeleton" />
-      <span className="h-[42px] w-full sm:w-48 skeleton" />
+      <span className="h-[2.625rem] w-full sm:w-36 border border-dashed border-line skeleton" />
+      <span className="h-[2.625rem] w-full sm:w-[16.25rem] skeleton" />
+      <span className="h-[2.625rem] w-full sm:w-48 skeleton" />
     </div>
   </section>
 );

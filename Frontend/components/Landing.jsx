@@ -256,7 +256,7 @@ const Landing = ({ onSignIn, theme }) => {
             <span className="text-2xl sm:text-3xl font-bold tabular-nums">
               {reportMock.score}
             </span>
-            <span className="text-[9px] text-muted uppercase tracking-widest">
+            <span className="text-[0.5625rem] text-muted uppercase tracking-widest">
               profile score / 100
             </span>
             <div className="h-1.5 w-24 sm:w-28 bg-line overflow-hidden">
@@ -270,7 +270,7 @@ const Landing = ({ onSignIn, theme }) => {
           {reportMock.stats.map((s) => (
             <div key={s.label} className="bg-surface p-2 text-center">
               <p className="font-bold text-sm tabular-nums">{s.value}</p>
-              <p className="text-[9px] text-muted uppercase tracking-wider">{s.label}</p>
+              <p className="text-[0.5625rem] text-muted uppercase tracking-wider">{s.label}</p>
             </div>
           ))}
         </div>
@@ -279,13 +279,13 @@ const Landing = ({ onSignIn, theme }) => {
         <div className="border-b border-line p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
             <p className="text-xs font-medium">Commit Activity</p>
-            <p className="text-muted text-[11px] tabular-nums">
+            <p className="text-muted text-[0.6875rem] tabular-nums">
               {reportMock.heatTotal} commits · {reportMock.heatStreak}-day streak
             </p>
           </div>
-          <div className="flex gap-[2px]">
+          <div className="flex gap-[0.125rem]">
             {reportMock.heatWeeks.map((week, w) => (
-              <div key={w} className="flex flex-col gap-[2px]">
+              <div key={w} className="flex flex-col gap-[0.125rem]">
                 {week.map((n, d) => (
                   <span
                     key={d}
@@ -295,7 +295,7 @@ const Landing = ({ onSignIn, theme }) => {
               </div>
             ))}
           </div>
-          <p className="text-muted text-[11px] mt-2">
+          <p className="text-muted text-[0.6875rem] mt-2">
             Public commits you authored, January to December
           </p>
         </div>
@@ -313,10 +313,10 @@ const Landing = ({ onSignIn, theme }) => {
             {reportMock.quality.checks.map((c) => (
               <div key={c.label}>
                 <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-muted text-[10px] uppercase tracking-wider">
+                  <span className="text-muted text-[0.625rem] uppercase tracking-wider">
                     {c.label}
                   </span>
-                  <span className="text-[10px] tabular-nums">{c.pct}%</span>
+                  <span className="text-[0.625rem] tabular-nums">{c.pct}%</span>
                 </div>
                 <div className="h-1 bg-line mt-1 overflow-hidden">
                   <div className="h-full bg-ink" style={{ width: `${c.pct}%` }} />
@@ -335,7 +335,7 @@ const Landing = ({ onSignIn, theme }) => {
                 <span
                   key={s}
                   className="inline-flex items-center gap-1 border border-line
-                    px-1.5 py-0.5 text-[11px]"
+                    px-1.5 py-0.5 text-[0.6875rem]"
                 >
                   <SkillIcon skill={s} isDark={isDark} />
                   {s}
@@ -349,7 +349,7 @@ const Landing = ({ onSignIn, theme }) => {
               {reportMock.activity.map((a) => (
                 <div key={a.title} className="border border-line p-2">
                   <p className="text-xs font-medium">{a.title}</p>
-                  <p className="text-muted text-[11px] mt-0.5 leading-snug">{a.detail}</p>
+                  <p className="text-muted text-[0.6875rem] mt-0.5 leading-snug">{a.detail}</p>
                 </div>
               ))}
             </div>
@@ -365,7 +365,7 @@ const Landing = ({ onSignIn, theme }) => {
           ].map(([title, items]) => (
             <div key={title} className="bg-surface p-4">
               <p className="text-xs font-medium mb-1.5">{title}</p>
-              <ul className="text-muted text-[11px] leading-snug space-y-1">
+              <ul className="text-muted text-[0.6875rem] leading-snug space-y-1">
                 {items.map((t) => (
                   <li key={t} className="flex gap-1.5">
                     <span aria-hidden="true">&middot;</span>
@@ -384,14 +384,14 @@ const Landing = ({ onSignIn, theme }) => {
               <p className="text-xs font-medium">
                 Role Fit — {reportMock.roleFit.role}
               </p>
-              <p className="text-muted text-[11px] mt-0.5 leading-snug">
+              <p className="text-muted text-[0.6875rem] mt-0.5 leading-snug">
                 {reportMock.roleFit.summary}
               </p>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               <span className="text-xl font-bold tabular-nums">
                 {reportMock.roleFit.score}
-                <span className="text-muted text-[11px] font-normal">/100</span>
+                <span className="text-muted text-[0.6875rem] font-normal">/100</span>
               </span>
               <div className="h-1.5 w-24 bg-line overflow-hidden">
                 <div
@@ -404,8 +404,8 @@ const Landing = ({ onSignIn, theme }) => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="border border-line p-2">
-              <p className="text-[11px] font-medium mb-1">In your favour</p>
-              <ul className="text-muted text-[11px] leading-snug space-y-1">
+              <p className="text-[0.6875rem] font-medium mb-1">In your favour</p>
+              <ul className="text-muted text-[0.6875rem] leading-snug space-y-1">
                 {reportMock.roleFit.strengths.map((t) => (
                   <li key={t} className="flex gap-1.5">
                     <span aria-hidden="true">&middot;</span>
@@ -415,8 +415,8 @@ const Landing = ({ onSignIn, theme }) => {
               </ul>
             </div>
             <div className="border border-line p-2">
-              <p className="text-[11px] font-medium mb-1">Missing from resume</p>
-              <ul className="text-muted text-[11px] leading-snug space-y-1">
+              <p className="text-[0.6875rem] font-medium mb-1">Missing from resume</p>
+              <ul className="text-muted text-[0.6875rem] leading-snug space-y-1">
                 {reportMock.roleFit.gaps.map((t) => (
                   <li key={t} className="flex gap-1.5">
                     <span aria-hidden="true">&middot;</span>
@@ -427,18 +427,18 @@ const Landing = ({ onSignIn, theme }) => {
             </div>
           </div>
 
-          <p className="text-[11px] font-medium mt-3 mb-1.5">
+          <p className="text-[0.6875rem] font-medium mt-3 mb-1.5">
             What to learn &amp; build next
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {reportMock.roleFit.roadmap.map((r) => (
               <div key={r.title} className="border border-line p-2">
-                <span className="text-[8px] uppercase tracking-widest text-muted
+                <span className="text-[0.5rem] uppercase tracking-widest text-muted
                   border border-line px-1 py-0.5">
                   {r.kind === "build" ? "Build" : "Learn"}
                 </span>
-                <p className="text-[11px] font-medium mt-1.5">{r.title}</p>
-                <p className="text-muted text-[11px] mt-0.5 leading-snug">
+                <p className="text-[0.6875rem] font-medium mt-1.5">{r.title}</p>
+                <p className="text-muted text-[0.6875rem] mt-0.5 leading-snug">
                   {r.detail}
                 </p>
               </div>

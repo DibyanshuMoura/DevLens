@@ -6,7 +6,7 @@ const RoadmapItem = ({ item }) => {
   const kind = item.kind === "build" ? "build" : "learn";
   return (
     <div className="border border-line p-3 flex flex-col lift">
-      <span className="text-[9px] uppercase tracking-widest text-muted self-start
+      <span className="text-[0.5625rem] uppercase tracking-widest text-muted self-start
         border border-line px-1.5 py-0.5">
         {KIND_LABEL[kind]}
       </span>
@@ -19,7 +19,7 @@ const RoadmapItem = ({ item }) => {
           {item.skills.map((s, i) => (
             <span
               key={`${s}-${i}`}
-              className="border border-line px-1.5 py-0.5 text-[10px] wrap-break-word"
+              className="border border-line px-1.5 py-0.5 text-[0.625rem] wrap-break-word"
             >
               {s}
             </span>

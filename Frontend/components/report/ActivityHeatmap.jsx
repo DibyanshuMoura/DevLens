@@ -3,9 +3,9 @@ import { Panel } from "./Panel";
 
 const LEVELS = ["bg-transparent", "bg-ink/15", "bg-ink/35", "bg-ink/60", "bg-ink"];
 const CELL = "flex-1 min-w-0 aspect-square border border-line";
-const GAP = "gap-[2px]";
+const GAP = "gap-[0.125rem]";
 const GUTTER = "w-7 shrink-0";
-const MIN_W = "min-w-[620px]";
+const MIN_W = "min-w-[38.75rem]";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -55,7 +55,7 @@ function monthLabels(columns, year) {
 const Stat = ({ label, value }) => (
   <div className="border border-line px-3 py-2 min-w-0">
     <p className="font-bold text-lg tabular-nums truncate">{value}</p>
-    <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">
+    <p className="text-[0.625rem] text-muted uppercase tracking-wider mt-0.5">
       {label}
     </p>
   </div>
@@ -103,7 +103,7 @@ const ActivityHeatmap = ({ activity, title, className = "" }) => {
             {labels.map((label, i) => (
               <span
                 key={i}
-                className="flex-1 min-w-0 text-[9px] leading-none text-muted
+                className="flex-1 min-w-0 text-[0.5625rem] leading-none text-muted
                   truncate"
               >
                 {label}
@@ -117,7 +117,7 @@ const ActivityHeatmap = ({ activity, title, className = "" }) => {
               return (
                 <div key={label} className="flex items-center">
                   <span
-                    className={`${GUTTER} text-[9px] text-muted pr-1 text-right
+                    className={`${GUTTER} text-[0.5625rem] text-muted pr-1 text-right
                       flex items-center justify-end`}
                   >
                     {label}
@@ -144,7 +144,7 @@ const ActivityHeatmap = ({ activity, title, className = "" }) => {
       </div>
 
       {}
-      <div className="flex items-center justify-between gap-3 flex-wrap mt-4 text-[10px] text-muted">
+      <div className="flex items-center justify-between gap-3 flex-wrap mt-4 text-[0.625rem] text-muted">
         <span className="sm:hidden">Swipe the grid sideways to see the full year</span>
         <span>
           {activity.busiestWeekday

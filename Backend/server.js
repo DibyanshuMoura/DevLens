@@ -638,8 +638,21 @@ app.post("/analyze", requireSignedIn, upload.single("resume"), async (req, res) 
 });
 
 app.use((err, _req, res, _next) => {
-  res.status(400).json({
-    message: err.message || "Upload failed",
+  /* Distinguish the upload failures a client can actually act on. Previously
+     everything collapsed to 400 with multer's raw message. */
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      message: "That PDF is too large — please pick one under 5 MB.",
+    });
+  }
+  if (err?.code === "LIMIT_UNEXPECTED_FILE" || /PDF/i.test(err?.message || "")) {
+    return res.status(415).json({
+      message: "Only PDF files are allowed.",
+    });
+  }
+  console.error("Unhandled request error:", err?.message || err);
+  res.status(500).json({
+    message: err?.message || "Upload failed",
   });
 });
 

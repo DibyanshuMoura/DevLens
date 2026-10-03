@@ -41,7 +41,7 @@ export const ScoreMeter = ({
         )}
       </span>
       {caption && (
-        <span className="text-[10px] text-muted uppercase tracking-widest">
+        <span className="text-[0.625rem] text-muted uppercase tracking-widest">
           {caption}
         </span>
       )}

@@ -3,6 +3,7 @@ import Header, { ThemeToggle } from "../components/Header";
 import Middle from "../components/Middle";
 import Footer from "../components/Footer";
 import Landing from "../components/Landing";
+import PlusPattern from "../components/PlusPattern";
 import {
   clearToken,
   fetchMe,
@@ -60,7 +61,8 @@ const App = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-canvas flex flex-col">
+    <div className="plusminus w-full min-h-screen bg-canvas flex flex-col">
+      <PlusPattern />
       {session.err && (
         <p className="bg-ink text-on-ink text-sm text-center py-2 px-4 anim-fade-in">
           {session.err}
