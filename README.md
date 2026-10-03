@@ -22,7 +22,6 @@ resume, and it tells you what your GitHub proves that your resume never claims.
 - [Data Model](#data-model)
 - [Design Notes](#design-notes)
 - [Known Limits](#known-limits)
-- [Screenshots](#screenshots)
 
 ---
 
@@ -331,30 +330,6 @@ usages are grids of `div`s — an `li` selector silently animates nothing.
   path.
 - **Render's free tier sleeps.** After ~15 minutes idle the service takes 30–50s
   to wake. Use a paid instance or a keep-alive ping if that matters.
-
----
-
-## Screenshots
-
-### Landing
-
-<img width="100%" alt="Landing page" src="./Screenshots/Homepage.png">
-
-### Analysis report
-
-<img width="100%" alt="Analysis report" src="./Screenshots/Analysis.png">
-
-### Mobile
-
-<img width="40%" alt="Mobile view" src="./Screenshots/Mobile.png">
-
----
-
-## Contributing
-
-Pull requests are welcome. For larger changes, please open an issue first.
-
-Run `npm run lint` and `npm test` in both packages before opening a PR.
 
 ---
 
