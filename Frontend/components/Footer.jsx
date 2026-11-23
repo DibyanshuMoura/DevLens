@@ -36,11 +36,11 @@ const Footer = () => {
             href="mailto:work.dibyanshumoura@gmail.com"
             className="text-muted hover:text-ink transition-colors w-fit"
           >
-            work.dibyanshumoura@gmail.com
+            work.abc@gmail.com
           </a>
           <div className="flex items-center gap-3 mt-1">
             <a
-              href="https://github.com/DibyanshuMoura"
+              href="#"
               target="_blank"
               rel="noopener noreferrer"
               className="opacity-70 hover:opacity-100 transition-opacity"
@@ -49,7 +49,7 @@ const Footer = () => {
               <img src={githubLogo} alt="GitHub" className="h-5 w-5 dark:invert" />
             </a>
             <a
-              href="https://x.com/DibyanshuMoura"
+              href="#"
               target="_blank"
               rel="noopener noreferrer"
               className="opacity-70 hover:opacity-100 transition-opacity"
